@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/ceph/go-ceph/rados"
-	discoveryv1 "k8s.io/api/discovery/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -92,7 +92,7 @@ func main() {
 
 	var clientset *kubernetes.Clientset
 	if dashboardSlice != "" || prometheusSlice != "" {
-		clientset, err = getKubeClient(kubeconfig)
+		clientset, err = getKubeClient()
 		if err != nil {
 			slog.Error("failed to connect to kubernetes", "error", err)
 			os.Exit(1)
@@ -153,7 +153,7 @@ func run(ctx context.Context, conn *rados.Conn, clientset *kubernetes.Clientset)
 		if err != nil {
 			return fmt.Errorf("failed to parse dashboard URL: %w", err)
 		}
-		if err := updateEndpointSlice(ctx, clientset, namespace, serviceName, dashboardSlice, "dashboard", addr); err != nil {
+		if err := updateEndpointSlice(ctx, clientset, dashboardSlice, "dashboard", addr); err != nil {
 			return fmt.Errorf("failed to update dashboard EndpointSlice: %w", err)
 		}
 	}
@@ -166,7 +166,7 @@ func run(ctx context.Context, conn *rados.Conn, clientset *kubernetes.Clientset)
 		if err != nil {
 			return fmt.Errorf("failed to parse prometheus URL: %w", err)
 		}
-		if err := updateEndpointSlice(ctx, clientset, namespace, serviceName, prometheusSlice, "prometheus", addr); err != nil {
+		if err := updateEndpointSlice(ctx, clientset, prometheusSlice, "prometheus", addr); err != nil {
 			return fmt.Errorf("failed to update prometheus EndpointSlice: %w", err)
 		}
 	}
@@ -257,12 +257,12 @@ func parseServiceURL(rawURL string) (*EndpointAddress, error) {
 	}, nil
 }
 
-func getKubeClient(kubeconfigPath string) (*kubernetes.Clientset, error) {
+func getKubeClient() (*kubernetes.Clientset, error) {
 	var config *rest.Config
 	var err error
 
-	if kubeconfigPath != "" {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	if kubeconfig != "" {
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
 			return nil, fmt.Errorf("build config from kubeconfig: %w", err)
 		}
@@ -282,7 +282,7 @@ func getKubeClient(kubeconfigPath string) (*kubernetes.Clientset, error) {
 }
 
 func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset,
-	namespace, serviceName, sliceName, portName string, addr *EndpointAddress) error {
+	sliceName, portName string, addr *EndpointAddress) error {
 
 	sliceClient := clientset.DiscoveryV1().EndpointSlices(namespace)
 
@@ -290,7 +290,7 @@ func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset,
 	if err != nil && !errors.IsNotFound(err) {
 		return fmt.Errorf("get EndpointSlice: %w", err)
 	}
-	if err == nil && endpointSliceMatches(existing, serviceName, portName, addr) {
+	if err == nil && endpointSliceMatches(existing, portName, addr) {
 		slog.Debug("EndpointSlice already up-to-date", "namespace", namespace, "name", sliceName)
 		return nil
 	}
@@ -336,7 +336,7 @@ func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset,
 	return nil
 }
 
-func endpointSliceMatches(slice *discoveryv1.EndpointSlice, serviceName, portName string, addr *EndpointAddress) bool {
+func endpointSliceMatches(slice *discoveryv1.EndpointSlice, portName string, addr *EndpointAddress) bool {
 	if slice.Labels["kubernetes.io/service-name"] != serviceName {
 		return false
 	}
