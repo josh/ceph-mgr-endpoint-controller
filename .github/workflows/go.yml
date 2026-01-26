@@ -15,6 +15,11 @@ jobs:
         with:
           go-version: "1.25.5"
 
+      - name: Install librados
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y librados-dev
+
       - name: Build
         run: |
           go build
