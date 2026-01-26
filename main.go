@@ -172,6 +172,11 @@ func run(ctx context.Context, conn *rados.Conn, clientset *kubernetes.Clientset)
 	return nil
 }
 
+type MonCommand struct {
+	Prefix string `json:"prefix"`
+	Format string `json:"format"`
+}
+
 type MgrServices struct {
 	Dashboard  string `json:"dashboard"`
 	Prometheus string `json:"prometheus"`
@@ -182,11 +187,10 @@ type EndpointAddress struct {
 	Port int32
 }
 
+var mgrServicesCommand = MonCommand{Prefix: "mgr services", Format: "json"}
+
 func getMgrServices(conn *rados.Conn) (*MgrServices, error) {
-	cmd, err := json.Marshal(map[string]string{
-		"prefix": "mgr services",
-		"format": "json",
-	})
+	cmd, err := json.Marshal(mgrServicesCommand)
 	if err != nil {
 		return nil, fmt.Errorf("marshal command: %w", err)
 	}
