@@ -21,96 +21,14 @@ Flags:
   -debug                   Enable debug logging
 ```
 
-## Kubernetes Deployment
+## Installation
 
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: ceph
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: ceph-mgr-endpoint-controller
-  namespace: ceph
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: ceph-mgr-endpoint-controller
-  namespace: ceph
-rules:
-  - apiGroups: ["discovery.k8s.io"]
-    resources: ["endpointslices"]
-    verbs: ["get", "create", "update"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: ceph-mgr-endpoint-controller
-  namespace: ceph
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: ceph-mgr-endpoint-controller
-subjects:
-  - kind: ServiceAccount
-    name: ceph-mgr-endpoint-controller
-    namespace: ceph
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ceph-mgr-endpoint-controller
-  namespace: ceph
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: ceph-mgr-endpoint-controller
-  template:
-    metadata:
-      labels:
-        app: ceph-mgr-endpoint-controller
-    spec:
-      serviceAccountName: ceph-mgr-endpoint-controller
-      containers:
-        - name: controller
-          image: ghcr.io/josh/ceph-mgr-endpoint-controller:latest
-          args:
-            - -namespace=ceph
-            - -service=ceph-mgr
-            - -dashboard-slice=ceph-mgr-dashboard
-            - -prometheus-slice=ceph-mgr-prometheus
-            - -interval=30s
-          volumeMounts:
-            - name: ceph-config
-              mountPath: /etc/ceph
-              readOnly: true
-      volumes:
-        - name: ceph-config
-          projected:
-            sources:
-              - configMap:
-                  name: ceph-config
-              - secret:
-                  name: ceph-keyring
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ceph-mgr
-  namespace: ceph
-spec:
-  ports:
-    - name: dashboard
-      port: 8443
-      targetPort: dashboard
-    - name: prometheus
-      port: 9283
-      targetPort: prometheus
+```bash
+helm install ceph-mgr-endpoint-controller ./charts/ceph-mgr-endpoint-controller \
+  --set cephConfig.secret.name=your-ceph-keyring
 ```
+
+See [values.yaml](./charts/ceph-mgr-endpoint-controller/values.yaml) for configuration options.
 
 ## Requirements
 

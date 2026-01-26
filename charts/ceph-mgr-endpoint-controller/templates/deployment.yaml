@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ceph-mgr-endpoint-controller.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ceph-mgr-endpoint-controller.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "ceph-mgr-endpoint-controller.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ceph-mgr-endpoint-controller.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "ceph-mgr-endpoint-controller.serviceAccountName" . }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: controller
+          image: "{{ .Values.image.repository }}:{{ include "ceph-mgr-endpoint-controller.imageTag" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - -namespace={{ .Values.controller.namespace }}
+            - -service={{ .Values.controller.service }}
+            - -dashboard-slice={{ .Values.controller.dashboardSlice }}
+            - -prometheus-slice={{ .Values.controller.prometheusSlice }}
+            - -interval={{ .Values.controller.interval }}
+            {{- if .Values.controller.debug }}
+            - -debug
+            {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: ceph-config
+              mountPath: /etc/ceph
+              readOnly: true
+      volumes:
+        - name: ceph-config
+          projected:
+            sources:
+              - configMap:
+                  name: {{ .Values.cephConfig.configMap.name }}
+              - secret:
+                  name: {{ .Values.cephConfig.secret.name }}

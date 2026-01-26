@@ -1,0 +1,7 @@
+apiVersion: v2
+name: ceph-mgr-endpoint-controller
+description: A Kubernetes controller that discovers Ceph Manager services and creates corresponding EndpointSlices
+type: application
+version: 0.0.0
+appVersion: "0.0.0"
+kubeVersion: ">=1.29.0"
