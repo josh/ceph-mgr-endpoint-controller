@@ -50,7 +50,7 @@ func getEnvDuration(key string) time.Duration {
 
 var (
 	kubeconfig      = getEnv("CEPH_MGR_KUBECONFIG", "")
-	namespace       = getEnv("CEPH_MGR_NAMESPACE", "ceph")
+	namespace       = getEnv("CEPH_MGR_NAMESPACE", "")
 	serviceName     = getEnv("CEPH_MGR_SERVICE_NAME", "")
 	dashboardSlice  = getEnv("CEPH_MGR_DASHBOARD_SLICE", "")
 	prometheusSlice = getEnv("CEPH_MGR_PROMETHEUS_SLICE", "")
@@ -61,6 +61,11 @@ var (
 func main() {
 	if debug {
 		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	}
+
+	if (dashboardSlice != "" || prometheusSlice != "") && namespace == "" {
+		slog.Error("CEPH_MGR_NAMESPACE is required when creating EndpointSlices")
+		os.Exit(1)
 	}
 
 	if (dashboardSlice != "" || prometheusSlice != "") && serviceName == "" {

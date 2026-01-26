@@ -4,7 +4,7 @@ image:
   pullPolicy: IfNotPresent
 
 controller:
-  namespace: ceph
+  namespace: ""
   service: ceph-mgr
   dashboardSlice: ceph-mgr-dashboard
   prometheusSlice: ceph-mgr-prometheus
