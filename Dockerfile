@@ -18,4 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /app/ceph-mgr-endpoint-controller /usr/local/bin/
 
+LABEL org.opencontainers.image.source="https://github.com/josh/ceph-mgr-endpoint-controller"
+LABEL org.opencontainers.image.description="Ceph MGR Endpoint Controller"
+LABEL org.opencontainers.image.licenses="MIT"
+
 ENTRYPOINT ["ceph-mgr-endpoint-controller"]
