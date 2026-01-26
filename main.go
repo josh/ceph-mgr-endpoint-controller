@@ -20,7 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 func getEnv(key, defaultValue string) string {
@@ -49,7 +48,6 @@ func getEnvDuration(key string) time.Duration {
 }
 
 var (
-	kubeconfig      = getEnv("CEPH_MGR_KUBECONFIG", "")
 	namespace       = getEnv("CEPH_MGR_NAMESPACE", "")
 	serviceName     = getEnv("CEPH_MGR_SERVICE_NAME", "")
 	dashboardSlice  = getEnv("CEPH_MGR_DASHBOARD_SLICE", "")
@@ -258,19 +256,9 @@ func parseServiceURL(rawURL string) (*EndpointAddress, error) {
 }
 
 func getKubeClient() (*kubernetes.Clientset, error) {
-	var config *rest.Config
-	var err error
-
-	if kubeconfig != "" {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			return nil, fmt.Errorf("build config from kubeconfig: %w", err)
-		}
-	} else {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return nil, fmt.Errorf("in-cluster config: %w", err)
-		}
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("in-cluster config: %w", err)
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
