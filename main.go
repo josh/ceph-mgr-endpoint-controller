@@ -231,22 +231,7 @@ func parseServiceURL(rawURL string) (*EndpointAddress, error) {
 
 	ip := net.ParseIP(host)
 	if ip == nil {
-		ips, err := net.LookupIP(host)
-		if err != nil {
-			return nil, fmt.Errorf("resolve hostname %s: %w", host, err)
-		}
-		if len(ips) == 0 {
-			return nil, fmt.Errorf("no IPs found for hostname: %s", host)
-		}
-		for _, resolvedIP := range ips {
-			if resolvedIP.To4() != nil {
-				ip = resolvedIP
-				break
-			}
-		}
-		if ip == nil {
-			ip = ips[0]
-		}
+		return nil, fmt.Errorf("expected IP address, got hostname: %s", host)
 	}
 
 	return &EndpointAddress{
