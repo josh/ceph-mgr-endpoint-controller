@@ -31,3 +31,7 @@ jobs:
       - name: Build
         run: |
           go build
+
+      - name: Check
+        run: |
+          ./ceph-mgr-endpoint-controller build-check
