@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ceph/go-ceph/rados"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,19 +25,21 @@ import (
 )
 
 var (
-	kubeconfig    string
-	namespace     string
-	dashboardSvc  string
-	prometheusSvc string
-	interval      time.Duration
-	debug         bool
+	kubeconfig      string
+	namespace       string
+	serviceName     string
+	dashboardSlice  string
+	prometheusSlice string
+	interval        time.Duration
+	debug           bool
 )
 
 func init() {
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "path to kubeconfig file (uses in-cluster config if not set)")
-	flag.StringVar(&namespace, "namespace", "ceph", "Kubernetes namespace for Endpoints")
-	flag.StringVar(&dashboardSvc, "dashboard-service", "", "Service name for dashboard Endpoints")
-	flag.StringVar(&prometheusSvc, "prometheus-service", "", "Service name for prometheus Endpoints")
+	flag.StringVar(&namespace, "namespace", "ceph", "Kubernetes namespace for EndpointSlices")
+	flag.StringVar(&serviceName, "service", "", "parent Service name for EndpointSlices")
+	flag.StringVar(&dashboardSlice, "dashboard-slice", "", "EndpointSlice name for dashboard")
+	flag.StringVar(&prometheusSlice, "prometheus-slice", "", "EndpointSlice name for prometheus")
 	flag.DurationVar(&interval, "interval", 0, "polling interval (e.g. 30s, 1m); runs once if not set")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
 }
@@ -46,6 +49,11 @@ func main() {
 
 	if debug {
 		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	}
+
+	if (dashboardSlice != "" || prometheusSlice != "") && serviceName == "" {
+		slog.Error("-service is required when creating EndpointSlices")
+		os.Exit(1)
 	}
 
 	conn, err := rados.NewConn()
@@ -66,7 +74,7 @@ func main() {
 	}
 
 	var clientset *kubernetes.Clientset
-	if dashboardSvc != "" || prometheusSvc != "" {
+	if dashboardSlice != "" || prometheusSlice != "" {
 		clientset, err = getKubeClient(kubeconfig)
 		if err != nil {
 			slog.Error("failed to connect to kubernetes", "error", err)
@@ -116,11 +124,11 @@ func run(ctx context.Context, conn *rados.Conn, clientset *kubernetes.Clientset)
 		slog.Debug("discovered service", "service", "prometheus", "url", services.Prometheus)
 	}
 
-	if dashboardSvc == "" && prometheusSvc == "" {
+	if dashboardSlice == "" && prometheusSlice == "" {
 		return nil
 	}
 
-	if dashboardSvc != "" {
+	if dashboardSlice != "" {
 		if services.Dashboard == "" {
 			return fmt.Errorf("dashboard service URL not found in ceph mgr services")
 		}
@@ -128,12 +136,12 @@ func run(ctx context.Context, conn *rados.Conn, clientset *kubernetes.Clientset)
 		if err != nil {
 			return fmt.Errorf("failed to parse dashboard URL: %w", err)
 		}
-		if err := updateEndpoints(ctx, clientset, namespace, dashboardSvc, addr); err != nil {
-			return fmt.Errorf("failed to update dashboard endpoints: %w", err)
+		if err := updateEndpointSlice(ctx, clientset, namespace, serviceName, dashboardSlice, "dashboard", addr); err != nil {
+			return fmt.Errorf("failed to update dashboard EndpointSlice: %w", err)
 		}
 	}
 
-	if prometheusSvc != "" {
+	if prometheusSlice != "" {
 		if services.Prometheus == "" {
 			return fmt.Errorf("prometheus service URL not found in ceph mgr services")
 		}
@@ -141,8 +149,8 @@ func run(ctx context.Context, conn *rados.Conn, clientset *kubernetes.Clientset)
 		if err != nil {
 			return fmt.Errorf("failed to parse prometheus URL: %w", err)
 		}
-		if err := updateEndpoints(ctx, clientset, namespace, prometheusSvc, addr); err != nil {
-			return fmt.Errorf("failed to update prometheus endpoints: %w", err)
+		if err := updateEndpointSlice(ctx, clientset, namespace, serviceName, prometheusSlice, "prometheus", addr); err != nil {
+			return fmt.Errorf("failed to update prometheus EndpointSlice: %w", err)
 		}
 	}
 
@@ -256,68 +264,86 @@ func getKubeClient(kubeconfigPath string) (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func updateEndpoints(ctx context.Context, clientset *kubernetes.Clientset,
-	namespace, serviceName string, addr *EndpointAddress) error {
+func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset,
+	namespace, serviceName, sliceName, portName string, addr *EndpointAddress) error {
 
-	endpointsClient := clientset.CoreV1().Endpoints(namespace)
+	sliceClient := clientset.DiscoveryV1().EndpointSlices(namespace)
 
-	existing, err := endpointsClient.Get(ctx, serviceName, metav1.GetOptions{})
+	existing, err := sliceClient.Get(ctx, sliceName, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("get endpoints: %w", err)
+		return fmt.Errorf("get EndpointSlice: %w", err)
 	}
-	if err == nil && endpointsMatch(existing, addr) {
-		slog.Debug("endpoints already up-to-date", "namespace", namespace, "service", serviceName)
+	if err == nil && endpointSliceMatches(existing, serviceName, portName, addr) {
+		slog.Debug("EndpointSlice already up-to-date", "namespace", namespace, "name", sliceName)
 		return nil
 	}
 
-	endpoints := &corev1.Endpoints{
+	protocol := corev1.ProtocolTCP
+	slice := &discoveryv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
+			Name:      sliceName,
 			Namespace: namespace,
+			Labels: map[string]string{
+				"kubernetes.io/service-name": serviceName,
+			},
 		},
-		Subsets: []corev1.EndpointSubset{
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{
 			{
-				Addresses: []corev1.EndpointAddress{
-					{
-						IP: addr.IP,
-					},
-				},
-				Ports: []corev1.EndpointPort{
-					{
-						Port:     addr.Port,
-						Protocol: corev1.ProtocolTCP,
-					},
-				},
+				Addresses: []string{addr.IP},
+			},
+		},
+		Ports: []discoveryv1.EndpointPort{
+			{
+				Name:     &portName,
+				Port:     &addr.Port,
+				Protocol: &protocol,
 			},
 		},
 	}
 
-	_, err = endpointsClient.Update(ctx, endpoints, metav1.UpdateOptions{})
+	_, err = sliceClient.Update(ctx, slice, metav1.UpdateOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			_, err = endpointsClient.Create(ctx, endpoints, metav1.CreateOptions{})
+			_, err = sliceClient.Create(ctx, slice, metav1.CreateOptions{})
 			if err != nil {
-				return fmt.Errorf("create endpoints: %w", err)
+				return fmt.Errorf("create EndpointSlice: %w", err)
 			}
-			slog.Info("created endpoints", "namespace", namespace, "service", serviceName, "ip", addr.IP, "port", addr.Port)
+			slog.Info("created EndpointSlice", "namespace", namespace, "name", sliceName, "ip", addr.IP, "port", addr.Port)
 			return nil
 		}
-		return fmt.Errorf("update endpoints: %w", err)
+		return fmt.Errorf("update EndpointSlice: %w", err)
 	}
 
-	slog.Info("updated endpoints", "namespace", namespace, "service", serviceName, "ip", addr.IP, "port", addr.Port)
+	slog.Info("updated EndpointSlice", "namespace", namespace, "name", sliceName, "ip", addr.IP, "port", addr.Port)
 	return nil
 }
 
-func endpointsMatch(ep *corev1.Endpoints, addr *EndpointAddress) bool {
-	if len(ep.Subsets) != 1 {
+func endpointSliceMatches(slice *discoveryv1.EndpointSlice, serviceName, portName string, addr *EndpointAddress) bool {
+	if slice.Labels["kubernetes.io/service-name"] != serviceName {
 		return false
 	}
-	subset := ep.Subsets[0]
-	if len(subset.Addresses) != 1 || len(subset.Ports) != 1 {
+	if slice.AddressType != discoveryv1.AddressTypeIPv4 {
 		return false
 	}
-	return subset.Addresses[0].IP == addr.IP &&
-		subset.Ports[0].Port == addr.Port &&
-		subset.Ports[0].Protocol == corev1.ProtocolTCP
+	if len(slice.Endpoints) != 1 || len(slice.Endpoints[0].Addresses) != 1 {
+		return false
+	}
+	if slice.Endpoints[0].Addresses[0] != addr.IP {
+		return false
+	}
+	if len(slice.Ports) != 1 {
+		return false
+	}
+	port := slice.Ports[0]
+	if port.Name == nil || *port.Name != portName {
+		return false
+	}
+	if port.Port == nil || *port.Port != addr.Port {
+		return false
+	}
+	if port.Protocol == nil || *port.Protocol != corev1.ProtocolTCP {
+		return false
+	}
+	return true
 }
