@@ -172,24 +172,24 @@ func run(ctx context.Context, conn *rados.Conn, clientset *kubernetes.Clientset)
 	return nil
 }
 
-type MonCommand struct {
+type monCommand struct {
 	Prefix string `json:"prefix"`
 	Format string `json:"format"`
 }
 
-type MgrServices struct {
+type mgrServices struct {
 	Dashboard  string `json:"dashboard"`
 	Prometheus string `json:"prometheus"`
 }
 
-type EndpointAddress struct {
-	IP   string
-	Port int32
+type endpointAddress struct {
+	ip   string
+	port int32
 }
 
-var mgrServicesCommand = MonCommand{Prefix: "mgr services", Format: "json"}
+var mgrServicesCommand = monCommand{Prefix: "mgr services", Format: "json"}
 
-func getMgrServices(conn *rados.Conn) (*MgrServices, error) {
+func getMgrServices(conn *rados.Conn) (*mgrServices, error) {
 	cmd, err := json.Marshal(mgrServicesCommand)
 	if err != nil {
 		return nil, fmt.Errorf("marshal command: %w", err)
@@ -200,7 +200,7 @@ func getMgrServices(conn *rados.Conn) (*MgrServices, error) {
 		return nil, fmt.Errorf("mon command: %w", err)
 	}
 
-	var services MgrServices
+	var services mgrServices
 	if err := json.Unmarshal(buf, &services); err != nil {
 		return nil, fmt.Errorf("unmarshal response: %w", err)
 	}
@@ -208,7 +208,7 @@ func getMgrServices(conn *rados.Conn) (*MgrServices, error) {
 	return &services, nil
 }
 
-func parseServiceURL(rawURL string) (*EndpointAddress, error) {
+func parseServiceURL(rawURL string) (*endpointAddress, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse URL: %w", err)
@@ -238,9 +238,9 @@ func parseServiceURL(rawURL string) (*EndpointAddress, error) {
 		return nil, fmt.Errorf("expected IP address, got hostname: %s", host)
 	}
 
-	return &EndpointAddress{
-		IP:   ip.String(),
-		Port: int32(port),
+	return &endpointAddress{
+		ip:   ip.String(),
+		port: int32(port),
 	}, nil
 }
 
@@ -259,7 +259,7 @@ func getKubeClient() (*kubernetes.Clientset, error) {
 }
 
 func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset,
-	sliceName, portName string, addr *EndpointAddress) error {
+	sliceName, portName string, addr *endpointAddress) error {
 
 	sliceClient := clientset.DiscoveryV1().EndpointSlices(namespace)
 
@@ -284,13 +284,13 @@ func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset,
 		AddressType: discoveryv1.AddressTypeIPv4,
 		Endpoints: []discoveryv1.Endpoint{
 			{
-				Addresses: []string{addr.IP},
+				Addresses: []string{addr.ip},
 			},
 		},
 		Ports: []discoveryv1.EndpointPort{
 			{
 				Name:     &portName,
-				Port:     &addr.Port,
+				Port:     &addr.port,
 				Protocol: &protocol,
 			},
 		},
@@ -303,17 +303,17 @@ func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset,
 			if err != nil {
 				return fmt.Errorf("create EndpointSlice: %w", err)
 			}
-			slog.Info("created EndpointSlice", "namespace", namespace, "name", sliceName, "ip", addr.IP, "port", addr.Port)
+			slog.Info("created EndpointSlice", "namespace", namespace, "name", sliceName, "ip", addr.ip, "port", addr.port)
 			return nil
 		}
 		return fmt.Errorf("update EndpointSlice: %w", err)
 	}
 
-	slog.Info("updated EndpointSlice", "namespace", namespace, "name", sliceName, "ip", addr.IP, "port", addr.Port)
+	slog.Info("updated EndpointSlice", "namespace", namespace, "name", sliceName, "ip", addr.ip, "port", addr.port)
 	return nil
 }
 
-func endpointSliceMatches(slice *discoveryv1.EndpointSlice, portName string, addr *EndpointAddress) bool {
+func endpointSliceMatches(slice *discoveryv1.EndpointSlice, portName string, addr *endpointAddress) bool {
 	if slice.Labels["kubernetes.io/service-name"] != serviceName {
 		return false
 	}
@@ -323,7 +323,7 @@ func endpointSliceMatches(slice *discoveryv1.EndpointSlice, portName string, add
 	if len(slice.Endpoints) != 1 || len(slice.Endpoints[0].Addresses) != 1 {
 		return false
 	}
-	if slice.Endpoints[0].Addresses[0] != addr.IP {
+	if slice.Endpoints[0].Addresses[0] != addr.ip {
 		return false
 	}
 	if len(slice.Ports) != 1 {
@@ -333,7 +333,7 @@ func endpointSliceMatches(slice *discoveryv1.EndpointSlice, portName string, add
 	if port.Name == nil || *port.Name != portName {
 		return false
 	}
-	if port.Port == nil || *port.Port != addr.Port {
+	if port.Port == nil || *port.Port != addr.port {
 		return false
 	}
 	if port.Protocol == nil || *port.Protocol != corev1.ProtocolTCP {
