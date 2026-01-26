@@ -13,3 +13,7 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 14
+    groups:
+      kubernetes:
+        patterns:
+          - "k8s.io/*"
