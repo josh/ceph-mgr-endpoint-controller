@@ -57,6 +57,15 @@ var (
 )
 
 func main() {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "build-check":
+			os.Exit(runBuildCheck())
+		case "check":
+			os.Exit(runCheck())
+		}
+	}
+
 	if debug {
 		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	}
@@ -124,6 +133,104 @@ func main() {
 			}
 		}
 	}
+}
+
+func runBuildCheck() int {
+	fmt.Println("Build check:")
+
+	major, minor, patch := rados.Version()
+	fmt.Printf("  [PASS] librados: %d.%d.%d\n", major, minor, patch)
+
+	return 0
+}
+
+func runCheck() int {
+	fmt.Println("Deployment check:")
+
+	passed := 0
+	failed := 0
+	skipped := 0
+
+	major, minor, patch := rados.Version()
+	fmt.Printf("  [PASS] librados: %d.%d.%d\n", major, minor, patch)
+	passed++
+
+	conn, err := rados.NewConn()
+	if err != nil {
+		fmt.Printf("  [FAIL] Ceph config readable: %v\n", err)
+		failed++
+		fmt.Printf("\nResult: %d/%d checks passed, %d failed, %d skipped\n",
+			passed, passed+failed+skipped, failed, skipped)
+		return 1
+	}
+	defer conn.Shutdown()
+
+	if err := conn.ReadDefaultConfigFile(); err != nil {
+		fmt.Printf("  [FAIL] Ceph config readable: %v\n", err)
+		failed++
+	} else {
+		fmt.Println("  [PASS] Ceph config readable")
+		passed++
+	}
+
+	var cephConnected bool
+	if failed > 0 {
+		fmt.Println("  [SKIP] Ceph cluster connection (no config)")
+		skipped++
+	} else if err := conn.Connect(); err != nil {
+		fmt.Printf("  [FAIL] Ceph cluster connection: %v\n", err)
+		failed++
+	} else {
+		fmt.Println("  [PASS] Ceph cluster connection")
+		passed++
+		cephConnected = true
+	}
+
+	if !cephConnected {
+		fmt.Println("  [SKIP] Mon command execution (no connection)")
+		skipped++
+	} else if _, err := getMgrServices(conn); err != nil {
+		fmt.Printf("  [FAIL] Mon command execution: %v\n", err)
+		failed++
+	} else {
+		fmt.Println("  [PASS] Mon command execution")
+		passed++
+	}
+
+	var k8sConfig *rest.Config
+	k8sConfig, err = rest.InClusterConfig()
+	if err != nil {
+		fmt.Printf("  [FAIL] Kubernetes in-cluster config: %v\n", err)
+		failed++
+	} else {
+		fmt.Println("  [PASS] Kubernetes in-cluster config")
+		passed++
+	}
+
+	if k8sConfig == nil {
+		fmt.Println("  [SKIP] Kubernetes API (no config)")
+		skipped++
+	} else {
+		clientset, err := kubernetes.NewForConfig(k8sConfig)
+		if err != nil {
+			fmt.Printf("  [FAIL] Kubernetes API: %v\n", err)
+			failed++
+		} else if _, err := clientset.Discovery().ServerVersion(); err != nil {
+			fmt.Printf("  [FAIL] Kubernetes API: %v\n", err)
+			failed++
+		} else {
+			fmt.Println("  [PASS] Kubernetes API")
+			passed++
+		}
+	}
+
+	fmt.Printf("\nResult: %d/%d checks passed, %d failed, %d skipped\n",
+		passed, passed+failed+skipped, failed, skipped)
+
+	if failed > 0 {
+		return 1
+	}
+	return 0
 }
 
 func run(ctx context.Context, conn *rados.Conn, clientset *kubernetes.Clientset) error {
@@ -258,9 +365,7 @@ func getKubeClient() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset,
-	sliceName, portName string, addr *endpointAddress) error {
-
+func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset, sliceName, portName string, addr *endpointAddress) error {
 	sliceClient := clientset.DiscoveryV1().EndpointSlices(namespace)
 
 	existing, err := sliceClient.Get(ctx, sliceName, metav1.GetOptions{})
