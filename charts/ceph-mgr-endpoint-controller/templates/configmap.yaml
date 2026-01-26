@@ -1,0 +1,12 @@
+{{- if .Values.cephConfig.configMap.create }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.cephConfig.configMap.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ceph-mgr-endpoint-controller.labels" . | nindent 4 }}
+data:
+  ceph.conf: |
+    {{- .Values.cephConfig.configMap.content | nindent 4 }}
+{{- end }}

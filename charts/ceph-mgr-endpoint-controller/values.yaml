@@ -1,0 +1,35 @@
+image:
+  repository: ghcr.io/josh/ceph-mgr-endpoint-controller
+  tag: ""
+  pullPolicy: IfNotPresent
+
+controller:
+  namespace: ceph
+  service: ceph-mgr
+  dashboardSlice: ceph-mgr-dashboard
+  prometheusSlice: ceph-mgr-prometheus
+  interval: 30s
+  debug: false
+
+service:
+  create: true
+  ports:
+    dashboard: 8443
+    prometheus: 9283
+
+cephConfig:
+  configMap:
+    create: false
+    name: ceph-config
+    content: ""
+  secret:
+    name: ceph-keyring
+
+serviceAccount:
+  create: true
+  name: ""
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

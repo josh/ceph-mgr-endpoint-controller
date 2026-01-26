@@ -1,0 +1,17 @@
+{{- if .Values.service.create }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.controller.service }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ceph-mgr-endpoint-controller.labels" . | nindent 4 }}
+spec:
+  ports:
+    - name: dashboard
+      port: {{ .Values.service.ports.dashboard }}
+      targetPort: dashboard
+    - name: prometheus
+      port: {{ .Values.service.ports.prometheus }}
+      targetPort: prometheus
+{{- end }}
