@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"log/slog"
 	"net"
@@ -24,35 +23,48 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-var (
-	kubeconfig      string
-	namespace       string
-	serviceName     string
-	dashboardSlice  string
-	prometheusSlice string
-	interval        time.Duration
-	debug           bool
-)
-
-func init() {
-	flag.StringVar(&kubeconfig, "kubeconfig", "", "path to kubeconfig file (uses in-cluster config if not set)")
-	flag.StringVar(&namespace, "namespace", "ceph", "Kubernetes namespace for EndpointSlices")
-	flag.StringVar(&serviceName, "service", "", "parent Service name for EndpointSlices")
-	flag.StringVar(&dashboardSlice, "dashboard-slice", "", "EndpointSlice name for dashboard")
-	flag.StringVar(&prometheusSlice, "prometheus-slice", "", "EndpointSlice name for prometheus")
-	flag.DurationVar(&interval, "interval", 0, "polling interval (e.g. 30s, 1m); runs once if not set")
-	flag.BoolVar(&debug, "debug", false, "enable debug logging")
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
 
-func main() {
-	flag.Parse()
+func getEnvBool(key string) bool {
+	value := os.Getenv(key)
+	return value != "" && value != "0" && value != "false"
+}
 
+func getEnvDuration(key string) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return 0
+	}
+	d, err := time.ParseDuration(value)
+	if err != nil {
+		slog.Error("invalid duration", "env", key, "value", value, "error", err)
+		os.Exit(1)
+	}
+	return d
+}
+
+var (
+	kubeconfig      = getEnv("CEPH_MGR_KUBECONFIG", "")
+	namespace       = getEnv("CEPH_MGR_NAMESPACE", "ceph")
+	serviceName     = getEnv("CEPH_MGR_SERVICE_NAME", "")
+	dashboardSlice  = getEnv("CEPH_MGR_DASHBOARD_SLICE", "")
+	prometheusSlice = getEnv("CEPH_MGR_PROMETHEUS_SLICE", "")
+	interval        = getEnvDuration("CEPH_MGR_INTERVAL")
+	debug           = getEnvBool("CEPH_MGR_DEBUG")
+)
+
+func main() {
 	if debug {
 		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	}
 
 	if (dashboardSlice != "" || prometheusSlice != "") && serviceName == "" {
-		slog.Error("-service is required when creating EndpointSlices")
+		slog.Error("CEPH_MGR_SERVICE_NAME is required when creating EndpointSlices")
 		os.Exit(1)
 	}
 

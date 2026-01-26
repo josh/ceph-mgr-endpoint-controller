@@ -32,14 +32,20 @@ spec:
         - name: controller
           image: "{{ .Values.image.repository }}:{{ include "ceph-mgr-endpoint-controller.imageTag" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args:
-            - -namespace={{ .Values.controller.namespace }}
-            - -service={{ .Values.controller.service }}
-            - -dashboard-slice={{ .Values.controller.dashboardSlice }}
-            - -prometheus-slice={{ .Values.controller.prometheusSlice }}
-            - -interval={{ .Values.controller.interval }}
+          env:
+            - name: CEPH_MGR_NAMESPACE
+              value: {{ .Values.controller.namespace | quote }}
+            - name: CEPH_MGR_SERVICE_NAME
+              value: {{ .Values.controller.service | quote }}
+            - name: CEPH_MGR_DASHBOARD_SLICE
+              value: {{ .Values.controller.dashboardSlice | quote }}
+            - name: CEPH_MGR_PROMETHEUS_SLICE
+              value: {{ .Values.controller.prometheusSlice | quote }}
+            - name: CEPH_MGR_INTERVAL
+              value: {{ .Values.controller.interval | quote }}
             {{- if .Values.controller.debug }}
-            - -debug
+            - name: CEPH_MGR_DEBUG
+              value: "true"
             {{- end }}
           {{- with .Values.resources }}
           resources:
