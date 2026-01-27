@@ -24,3 +24,7 @@ jobs:
       - name: Template chart
         run: |
           helm template test ./charts/ceph-mgr-endpoint-controller
+
+      - name: Template chart (cronjob mode)
+        run: |
+          helm template test ./charts/ceph-mgr-endpoint-controller --set mode=cronjob

@@ -4,7 +4,6 @@ image:
   pullPolicy: IfNotPresent
 
 controller:
-  namespace: ""
   service: ceph-mgr
   dashboardSlice: ceph-mgr-dashboard
   prometheusSlice: ceph-mgr-prometheus
@@ -33,3 +32,11 @@ resources: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+mode: deployment
+
+cronjob:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1

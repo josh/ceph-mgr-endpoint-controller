@@ -1,3 +1,4 @@
+{{- if eq .Values.mode "deployment" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -34,7 +35,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: CEPH_MGR_NAMESPACE
-              value: {{ .Values.controller.namespace | default .Release.Namespace | quote }}
+              value: {{ .Release.Namespace | quote }}
             - name: CEPH_MGR_SERVICE_NAME
               value: {{ .Values.controller.service | quote }}
             - name: CEPH_MGR_DASHBOARD_SLICE
@@ -63,3 +64,4 @@ spec:
                   name: {{ .Values.cephConfig.configMap.name }}
               - secret:
                   name: {{ .Values.cephConfig.secret.name }}
+{{- end }}

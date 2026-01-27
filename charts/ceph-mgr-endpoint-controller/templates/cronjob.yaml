@@ -1,0 +1,68 @@
+{{- if eq .Values.mode "cronjob" }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "ceph-mgr-endpoint-controller.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ceph-mgr-endpoint-controller.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cronjob.schedule | quote }}
+  concurrencyPolicy: {{ .Values.cronjob.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.cronjob.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.cronjob.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "ceph-mgr-endpoint-controller.selectorLabels" . | nindent 12 }}
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: {{ include "ceph-mgr-endpoint-controller.serviceAccountName" . }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: controller
+              image: "{{ .Values.image.repository }}:{{ include "ceph-mgr-endpoint-controller.imageTag" . }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              env:
+                - name: CEPH_MGR_NAMESPACE
+                  value: {{ .Release.Namespace | quote }}
+                - name: CEPH_MGR_SERVICE_NAME
+                  value: {{ .Values.controller.service | quote }}
+                - name: CEPH_MGR_DASHBOARD_SLICE
+                  value: {{ .Values.controller.dashboardSlice | quote }}
+                - name: CEPH_MGR_PROMETHEUS_SLICE
+                  value: {{ .Values.controller.prometheusSlice | quote }}
+                {{- if .Values.controller.debug }}
+                - name: CEPH_MGR_DEBUG
+                  value: "true"
+                {{- end }}
+              {{- with .Values.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              volumeMounts:
+                - name: ceph-config
+                  mountPath: /etc/ceph
+                  readOnly: true
+          volumes:
+            - name: ceph-config
+              projected:
+                sources:
+                  - configMap:
+                      name: {{ .Values.cephConfig.configMap.name }}
+                  - secret:
+                      name: {{ .Values.cephConfig.secret.name }}
+{{- end }}
