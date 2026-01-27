@@ -302,9 +302,12 @@ func getMgrServices(conn *rados.Conn) (*mgrServices, error) {
 		return nil, fmt.Errorf("marshal command: %w", err)
 	}
 
-	buf, _, err := conn.MonCommand(cmd)
+	buf, info, err := conn.MonCommand(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("mon command: %w", err)
+	}
+	if info != "" {
+		slog.Debug("mon command info", "info", info)
 	}
 
 	var services mgrServices
