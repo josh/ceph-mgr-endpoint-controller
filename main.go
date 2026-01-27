@@ -339,6 +339,9 @@ func parseServiceURL(rawURL string) (*endpointAddress, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid port: %w", err)
 	}
+	if port < 1 || port > 65535 {
+		return nil, fmt.Errorf("port out of range: %d", port)
+	}
 
 	ip := net.ParseIP(host)
 	if ip == nil {
