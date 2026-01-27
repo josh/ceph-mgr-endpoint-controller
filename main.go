@@ -18,6 +18,7 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	discoveryv1apply "k8s.io/client-go/applyconfigurations/discovery/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -383,44 +384,28 @@ func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset, s
 		return nil
 	}
 
-	protocol := corev1.ProtocolTCP
-	slice := &discoveryv1.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      sliceName,
-			Namespace: namespace,
-			Labels: map[string]string{
-				"kubernetes.io/service-name": serviceName,
-			},
-		},
-		AddressType: discoveryv1.AddressTypeIPv4,
-		Endpoints: []discoveryv1.Endpoint{
-			{
-				Addresses: []string{addr.ip},
-			},
-		},
-		Ports: []discoveryv1.EndpointPort{
-			{
-				Name:     &portName,
-				Port:     &addr.port,
-				Protocol: &protocol,
-			},
-		},
-	}
+	slice := discoveryv1apply.EndpointSlice(sliceName, namespace).
+		WithLabels(map[string]string{
+			"kubernetes.io/service-name": serviceName,
+		}).
+		WithAddressType(discoveryv1.AddressTypeIPv4).
+		WithEndpoints(
+			discoveryv1apply.Endpoint().
+				WithAddresses(addr.ip),
+		).
+		WithPorts(
+			discoveryv1apply.EndpointPort().
+				WithName(portName).
+				WithPort(addr.port).
+				WithProtocol(corev1.ProtocolTCP),
+		)
 
-	_, err = sliceClient.Update(ctx, slice, metav1.UpdateOptions{})
+	_, err = sliceClient.Apply(ctx, slice, metav1.ApplyOptions{FieldManager: "ceph-mgr-endpoint-controller"})
 	if err != nil {
-		if errors.IsNotFound(err) {
-			_, err = sliceClient.Create(ctx, slice, metav1.CreateOptions{})
-			if err != nil {
-				return fmt.Errorf("create EndpointSlice: %w", err)
-			}
-			slog.Info("created EndpointSlice", "namespace", namespace, "name", sliceName, "ip", addr.ip, "port", addr.port)
-			return nil
-		}
-		return fmt.Errorf("update EndpointSlice: %w", err)
+		return fmt.Errorf("apply EndpointSlice: %w", err)
 	}
 
-	slog.Info("updated EndpointSlice", "namespace", namespace, "name", sliceName, "ip", addr.ip, "port", addr.port)
+	slog.Info("applied EndpointSlice", "namespace", namespace, "name", sliceName, "ip", addr.ip, "port", addr.port)
 	return nil
 }
 
