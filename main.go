@@ -42,7 +42,7 @@ func getEnvDuration(key string) time.Duration {
 	d, err := time.ParseDuration(value)
 	if err != nil {
 		slog.Error("invalid duration", "env", key, "value", value, "error", err)
-		os.Exit(1)
+		return 0
 	}
 	return d
 }
