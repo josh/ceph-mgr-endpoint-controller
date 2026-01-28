@@ -48,6 +48,18 @@ spec:
             - name: CEPH_MGR_DEBUG
               value: "true"
             {{- end }}
+            {{- if .Values.cephConfig.configPath }}
+            - name: CEPH_CONF
+              value: {{ .Values.cephConfig.configPath | quote }}
+            {{- end }}
+            {{- if .Values.cephConfig.keyringPath }}
+            - name: CEPH_KEYRING
+              value: {{ .Values.cephConfig.keyringPath | quote }}
+            {{- end }}
+            {{- if .Values.cephConfig.extraArgs }}
+            - name: CEPH_ARGS
+              value: {{ .Values.cephConfig.extraArgs | quote }}
+            {{- end }}
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

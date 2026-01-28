@@ -93,6 +93,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := conn.ParseDefaultConfigEnv(); err != nil {
+		slog.Error("failed to parse ceph args env", "error", err)
+		os.Exit(1)
+	}
+
 	if err := conn.Connect(); err != nil {
 		slog.Error("failed to connect to cluster", "error", err)
 		os.Exit(1)

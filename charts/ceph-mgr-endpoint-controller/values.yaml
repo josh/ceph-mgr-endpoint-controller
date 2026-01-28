@@ -23,6 +23,9 @@ cephConfig:
     content: ""
   secret:
     name: ceph-keyring
+  configPath: ""
+  keyringPath: ""
+  extraArgs: ""
 
 serviceAccount:
   create: true
