@@ -33,13 +33,21 @@ func getEnv(key, defaultValue string) string {
 }
 
 type rawConfig struct {
-	Debug    *bool  `json:"debug,omitempty"`
-	Interval string `json:"interval,omitempty"`
+	Debug           *bool  `json:"debug,omitempty"`
+	Interval        string `json:"interval,omitempty"`
+	Namespace       string `json:"namespace,omitempty"`
+	ServiceName     string `json:"serviceName,omitempty"`
+	DashboardSlice  string `json:"dashboardSlice,omitempty"`
+	PrometheusSlice string `json:"prometheusSlice,omitempty"`
 }
 
 type config struct {
-	debug    bool
-	interval time.Duration
+	debug           bool
+	interval        time.Duration
+	namespace       string
+	serviceName     string
+	dashboardSlice  string
+	prometheusSlice string
 }
 
 func loadConfig() (config, error) {
@@ -73,19 +81,25 @@ func loadConfig() (config, error) {
 	if raw.Debug != nil {
 		debug = *raw.Debug
 	}
+	if (raw.DashboardSlice != "" || raw.PrometheusSlice != "") && raw.Namespace == "" {
+		return config{}, fmt.Errorf("namespace is required when creating EndpointSlices")
+	}
+	if (raw.DashboardSlice != "" || raw.PrometheusSlice != "") && raw.ServiceName == "" {
+		return config{}, fmt.Errorf("service name is required when creating EndpointSlices")
+	}
 	return config{
-		debug:    debug,
-		interval: interval,
+		debug:           debug,
+		interval:        interval,
+		namespace:       raw.Namespace,
+		serviceName:     raw.ServiceName,
+		dashboardSlice:  raw.DashboardSlice,
+		prometheusSlice: raw.PrometheusSlice,
 	}, nil
 }
 
 var (
-	namespace       = getEnv("CEPH_MGR_NAMESPACE", "")
-	serviceName     = getEnv("CEPH_MGR_SERVICE_NAME", "")
-	dashboardSlice  = getEnv("CEPH_MGR_DASHBOARD_SLICE", "")
-	prometheusSlice = getEnv("CEPH_MGR_PROMETHEUS_SLICE", "")
-	cephID          = getEnv("CEPH_ID", "admin")
-	cfg             config
+	cephID = getEnv("CEPH_ID", "admin")
+	cfg    config
 )
 
 func main() {
@@ -110,16 +124,6 @@ func main() {
 	}
 
 	interval := cfg.interval
-
-	if (dashboardSlice != "" || prometheusSlice != "") && namespace == "" {
-		slog.Error("CEPH_MGR_NAMESPACE is required when creating EndpointSlices")
-		os.Exit(1)
-	}
-
-	if (dashboardSlice != "" || prometheusSlice != "") && serviceName == "" {
-		slog.Error("CEPH_MGR_SERVICE_NAME is required when creating EndpointSlices")
-		os.Exit(1)
-	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -156,7 +160,7 @@ func main() {
 	}
 
 	var clientset *kubernetes.Clientset
-	if dashboardSlice != "" || prometheusSlice != "" {
+	if cfg.dashboardSlice != "" || cfg.prometheusSlice != "" {
 		var err error
 		clientset, err = getKubeClient()
 		if err != nil {
@@ -342,11 +346,11 @@ func run(ctx context.Context, conn *rados.Conn, clientset *kubernetes.Clientset)
 		slog.Debug("discovered service", "service", "prometheus", "url", services.Prometheus)
 	}
 
-	if dashboardSlice == "" && prometheusSlice == "" {
+	if cfg.dashboardSlice == "" && cfg.prometheusSlice == "" {
 		return nil
 	}
 
-	if dashboardSlice != "" {
+	if cfg.dashboardSlice != "" {
 		if services.Dashboard == "" {
 			return fmt.Errorf("dashboard service URL not found in ceph mgr services")
 		}
@@ -354,12 +358,12 @@ func run(ctx context.Context, conn *rados.Conn, clientset *kubernetes.Clientset)
 		if err != nil {
 			return fmt.Errorf("failed to parse dashboard URL: %w", err)
 		}
-		if err := updateEndpointSlice(ctx, clientset, dashboardSlice, "dashboard", addr); err != nil {
+		if err := updateEndpointSlice(ctx, clientset, cfg.dashboardSlice, "dashboard", addr); err != nil {
 			return fmt.Errorf("failed to update dashboard EndpointSlice: %w", err)
 		}
 	}
 
-	if prometheusSlice != "" {
+	if cfg.prometheusSlice != "" {
 		if services.Prometheus == "" {
 			return fmt.Errorf("prometheus service URL not found in ceph mgr services")
 		}
@@ -367,7 +371,7 @@ func run(ctx context.Context, conn *rados.Conn, clientset *kubernetes.Clientset)
 		if err != nil {
 			return fmt.Errorf("failed to parse prometheus URL: %w", err)
 		}
-		if err := updateEndpointSlice(ctx, clientset, prometheusSlice, "prometheus", addr); err != nil {
+		if err := updateEndpointSlice(ctx, clientset, cfg.prometheusSlice, "prometheus", addr); err != nil {
 			return fmt.Errorf("failed to update prometheus EndpointSlice: %w", err)
 		}
 	}
@@ -468,20 +472,20 @@ func getKubeClient() (*kubernetes.Clientset, error) {
 }
 
 func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset, sliceName, portName string, addr *endpointAddress) error {
-	sliceClient := clientset.DiscoveryV1().EndpointSlices(namespace)
+	sliceClient := clientset.DiscoveryV1().EndpointSlices(cfg.namespace)
 
 	existing, err := sliceClient.Get(ctx, sliceName, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return fmt.Errorf("get EndpointSlice: %w", err)
 	}
 	if err == nil && endpointSliceMatches(existing, portName, addr) {
-		slog.Debug("EndpointSlice already up-to-date", "namespace", namespace, "name", sliceName)
+		slog.Debug("EndpointSlice already up-to-date", "namespace", cfg.namespace, "name", sliceName)
 		return nil
 	}
 
-	slice := discoveryv1apply.EndpointSlice(sliceName, namespace).
+	slice := discoveryv1apply.EndpointSlice(sliceName, cfg.namespace).
 		WithLabels(map[string]string{
-			"kubernetes.io/service-name": serviceName,
+			"kubernetes.io/service-name": cfg.serviceName,
 		}).
 		WithAddressType(discoveryv1.AddressTypeIPv4).
 		WithEndpoints(
@@ -495,8 +499,8 @@ func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset, s
 				WithProtocol(corev1.ProtocolTCP),
 		)
 
-	if svc, err := clientset.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{}); err != nil {
-		slog.Warn("failed to get service for owner reference", "namespace", namespace, "service", serviceName, "error", err)
+	if svc, err := clientset.CoreV1().Services(cfg.namespace).Get(ctx, cfg.serviceName, metav1.GetOptions{}); err != nil {
+		slog.Warn("failed to get service for owner reference", "namespace", cfg.namespace, "service", cfg.serviceName, "error", err)
 	} else {
 		slice = slice.WithOwnerReferences(
 			applyconfigmetav1.OwnerReference().
@@ -512,12 +516,12 @@ func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset, s
 		return fmt.Errorf("apply EndpointSlice: %w", err)
 	}
 
-	slog.Info("applied EndpointSlice", "namespace", namespace, "name", sliceName, "ip", addr.ip, "port", addr.port)
+	slog.Info("applied EndpointSlice", "namespace", cfg.namespace, "name", sliceName, "ip", addr.ip, "port", addr.port)
 	return nil
 }
 
 func endpointSliceMatches(slice *discoveryv1.EndpointSlice, portName string, addr *endpointAddress) bool {
-	if slice.Labels["kubernetes.io/service-name"] != serviceName {
+	if slice.Labels["kubernetes.io/service-name"] != cfg.serviceName {
 		return false
 	}
 	if slice.AddressType != discoveryv1.AddressTypeIPv4 {

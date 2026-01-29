@@ -44,14 +44,6 @@ spec:
               image: "{{ .Values.image.repository }}:{{ include "ceph-mgr-endpoint-controller.imageTag" . }}"
               imagePullPolicy: {{ .Values.image.pullPolicy }}
               env:
-                - name: CEPH_MGR_NAMESPACE
-                  value: {{ .Release.Namespace | quote }}
-                - name: CEPH_MGR_SERVICE_NAME
-                  value: {{ .Values.controller.serviceName | quote }}
-                - name: CEPH_MGR_DASHBOARD_SLICE
-                  value: {{ .Values.controller.dashboardSliceName | quote }}
-                - name: CEPH_MGR_PROMETHEUS_SLICE
-                  value: {{ .Values.controller.prometheusSliceName | quote }}
                 - name: CEPH_ID
                   value: {{ .Values.ceph.id | quote }}
                 {{- if .Values.ceph.configPath }}

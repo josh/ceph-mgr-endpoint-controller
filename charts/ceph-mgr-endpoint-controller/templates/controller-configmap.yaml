@@ -6,4 +6,4 @@ metadata:
   labels:
     {{- include "ceph-mgr-endpoint-controller.labels" . | nindent 4 }}
 data:
-  config.json: {{ dict "debug" .Values.controller.debug "interval" .Values.controller.interval | toJson | quote }}
+  config.json: {{ dict "debug" .Values.controller.debug "interval" .Values.controller.interval "namespace" .Release.Namespace "serviceName" .Values.controller.serviceName "dashboardSlice" .Values.controller.dashboardSliceName "prometheusSlice" .Values.controller.prometheusSliceName | toJson | quote }}
