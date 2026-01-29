@@ -69,6 +69,18 @@ spec:
             - name: CEPH_ARGS
               value: {{ join " " .Values.ceph.extraArgs | quote }}
             {{- end }}
+            {{- if eq .Values.ceph.keyring.type "csi" }}
+            - name: CEPH_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ceph.keyring.name }}
+                  key: userID
+            - name: CEPH_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ceph.keyring.name }}
+                  key: userKey
+            {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -89,6 +101,8 @@ spec:
             sources:
               - configMap:
                   name: {{ .Values.ceph.config.name }}
+              {{- if ne .Values.ceph.keyring.type "csi" }}
               - secret:
                   name: {{ .Values.ceph.keyring.name }}
+              {{- end }}
 {{- end }}

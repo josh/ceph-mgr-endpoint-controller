@@ -15,6 +15,7 @@ ceph:
     clusterID: ""
     monitors: []
   keyring:
+    type: keyring
     name: ceph-keyring
 
 controller:

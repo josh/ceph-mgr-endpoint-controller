@@ -103,6 +103,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	if cephKey := os.Getenv("CEPH_KEY"); cephKey != "" {
+		if err := conn.SetConfigOption("key", cephKey); err != nil {
+			slog.Error("failed to set ceph key", "error", err)
+			os.Exit(1)
+		}
+	}
+
 	slog.Debug("rados config", radosConfigAttrs(conn)...)
 
 	if err := conn.Connect(); err != nil {
