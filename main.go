@@ -111,7 +111,7 @@ func loadConfig() (config, error) {
 	}, nil
 }
 
-var version = "0.3.1"
+var version = "0.3.2"
 
 var cfg config
 
