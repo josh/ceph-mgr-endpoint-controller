@@ -98,8 +98,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	slog.Debug("rados config", radosConfigAttrs(conn)...)
+
 	if err := conn.Connect(); err != nil {
-		slog.Error("failed to connect to cluster", "error", err)
+		slog.Error("failed to connect to cluster", append([]any{"error", err}, radosConfigAttrs(conn)...)...)
 		os.Exit(1)
 	}
 
@@ -139,6 +141,16 @@ func main() {
 			}
 		}
 	}
+}
+
+func radosConfigAttrs(conn *rados.Conn) []any {
+	var attrs []any
+	for _, key := range []string{"name", "keyring", "mon_host"} {
+		if val, err := conn.GetConfigOption(key); err == nil {
+			attrs = append(attrs, key, val)
+		}
+	}
+	return attrs
 }
 
 func runBuildCheck() int {
@@ -185,6 +197,11 @@ func runCheck() int {
 		skipped++
 	} else if err := conn.Connect(); err != nil {
 		fmt.Printf("  [FAIL] Ceph cluster connection: %v\n", err)
+		for _, key := range []string{"name", "keyring", "mon_host"} {
+			if val, err := conn.GetConfigOption(key); err == nil {
+				fmt.Printf("         %s = %s\n", key, val)
+			}
+		}
 		failed++
 	} else {
 		fmt.Println("  [PASS] Ceph cluster connection")
