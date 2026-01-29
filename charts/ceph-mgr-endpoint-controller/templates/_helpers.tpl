@@ -42,5 +42,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{- define "ceph-mgr-endpoint-controller.imageTag" -}}
-{{- .Values.image.tag }}
-{{- end }}
+{{- if .Values.image.tag -}}
+    {{- .Values.image.tag -}}
+{{- else -}}
+    v{{ .Chart.AppVersion }}
+{{- end -}}
+{{- end -}}
