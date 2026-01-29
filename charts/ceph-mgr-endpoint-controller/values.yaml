@@ -3,32 +3,38 @@ image:
   tag: v0.1.0
   pullPolicy: IfNotPresent
 
+ceph:
+  id: admin
+  configPath: ""
+  keyringPath: ""
+  extraArgs: []
+  config:
+    create: true
+    name: ceph-config
+    content: ""
+    clusterID: ""
+    monitors: []
+  keyring:
+    name: ceph-keyring
+
 controller:
-  service: ceph-mgr
-  dashboardSlice: ceph-mgr-dashboard
-  prometheusSlice: ceph-mgr-prometheus
+  mode: deployment
+  serviceName: ceph-mgr
+  dashboardSliceName: ceph-mgr-dashboard
+  prometheusSliceName: ceph-mgr-prometheus
   interval: 30s
   debug: false
+  cronjob:
+    schedule: "*/5 * * * *"
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 1
+    failedJobsHistoryLimit: 1
 
 service:
   create: true
   ports:
     dashboard: 8443
     prometheus: 9283
-
-cephConfig:
-  id: admin
-  configMap:
-    create: true
-    name: ceph-config
-    content: ""
-    clusterID: ""
-    monitors: []
-  secret:
-    name: ceph-keyring
-  configPath: ""
-  keyringPath: ""
-  extraArgs: ""
 
 serviceAccount:
   create: true
@@ -38,11 +44,3 @@ resources: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
-
-mode: deployment
-
-cronjob:
-  schedule: "*/5 * * * *"
-  concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 1
-  failedJobsHistoryLimit: 1

@@ -1,4 +1,4 @@
-{{- if eq .Values.mode "deployment" }}
+{{- if eq .Values.controller.mode "deployment" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -37,30 +37,30 @@ spec:
             - name: CEPH_MGR_NAMESPACE
               value: {{ .Release.Namespace | quote }}
             - name: CEPH_MGR_SERVICE_NAME
-              value: {{ .Values.controller.service | quote }}
+              value: {{ .Values.controller.serviceName | quote }}
             - name: CEPH_MGR_DASHBOARD_SLICE
-              value: {{ .Values.controller.dashboardSlice | quote }}
+              value: {{ .Values.controller.dashboardSliceName | quote }}
             - name: CEPH_MGR_PROMETHEUS_SLICE
-              value: {{ .Values.controller.prometheusSlice | quote }}
+              value: {{ .Values.controller.prometheusSliceName | quote }}
             - name: CEPH_MGR_INTERVAL
               value: {{ .Values.controller.interval | quote }}
             - name: CEPH_ID
-              value: {{ .Values.cephConfig.id | quote }}
+              value: {{ .Values.ceph.id | quote }}
             {{- if .Values.controller.debug }}
             - name: CEPH_MGR_DEBUG
               value: "true"
             {{- end }}
-            {{- if .Values.cephConfig.configPath }}
+            {{- if .Values.ceph.configPath }}
             - name: CEPH_CONF
-              value: {{ .Values.cephConfig.configPath | quote }}
+              value: {{ .Values.ceph.configPath | quote }}
             {{- end }}
-            {{- if .Values.cephConfig.keyringPath }}
+            {{- if .Values.ceph.keyringPath }}
             - name: CEPH_KEYRING
-              value: {{ .Values.cephConfig.keyringPath | quote }}
+              value: {{ .Values.ceph.keyringPath | quote }}
             {{- end }}
-            {{- if .Values.cephConfig.extraArgs }}
+            {{- if .Values.ceph.extraArgs }}
             - name: CEPH_ARGS
-              value: {{ .Values.cephConfig.extraArgs | quote }}
+              value: {{ join " " .Values.ceph.extraArgs | quote }}
             {{- end }}
           {{- with .Values.resources }}
           resources:
@@ -75,7 +75,7 @@ spec:
           projected:
             sources:
               - configMap:
-                  name: {{ .Values.cephConfig.configMap.name }}
+                  name: {{ .Values.ceph.config.name }}
               - secret:
-                  name: {{ .Values.cephConfig.secret.name }}
+                  name: {{ .Values.ceph.keyring.name }}
 {{- end }}
