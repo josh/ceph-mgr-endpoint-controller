@@ -5,13 +5,12 @@ image:
 
 ceph:
   secret:
-    name: "{{ include "ceph-mgr-endpoint-controller.fullname" . }}-secret"
+    name: ceph-mgr-endpoint-controller-secret
     userID: userID
     userKey: userKey
   config:
     create: true
     name: ceph-config
-    content: ""
     clusterID: ""
     monitors: []
 
