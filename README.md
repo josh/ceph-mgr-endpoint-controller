@@ -10,23 +10,24 @@ This controller connects to a Ceph cluster via RADOS, queries the manager for av
 
 ```bash
 helm install ceph-mgr-endpoint-controller ./charts/ceph-mgr-endpoint-controller \
-  --set cephConfig.secret.name=your-ceph-keyring
+  --set ceph.keyring.name=your-ceph-keyring
 ```
 
 ## Configuration
 
-| Value                        | Description                             | Default               |
-| ---------------------------- | --------------------------------------- | --------------------- |
-| `controller.service`         | Parent Service name for EndpointSlices  | `ceph-mgr`            |
-| `controller.dashboardSlice`  | EndpointSlice name for dashboard        | `ceph-mgr-dashboard`  |
-| `controller.prometheusSlice` | EndpointSlice name for prometheus       | `ceph-mgr-prometheus` |
-| `controller.interval`        | Polling interval                        | `30s`                 |
-| `controller.debug`           | Enable debug logging                    | `false`               |
-| `service.create`             | Create a Service for the EndpointSlices | `true`                |
-| `service.ports.dashboard`    | Dashboard service port                  | `8443`                |
-| `service.ports.prometheus`   | Prometheus service port                 | `9283`                |
-| `cephConfig.configMap.name`  | ConfigMap containing ceph.conf          | `ceph-config`         |
-| `cephConfig.secret.name`     | Secret containing Ceph keyring          | `ceph-keyring`        |
+| Value                          | Description                             | Default               |
+| ------------------------------ | --------------------------------------- | --------------------- |
+| `controller.mode`              | Run as `deployment` or `cronjob`        | `deployment`          |
+| `controller.serviceName`       | Parent Service name for EndpointSlices  | `ceph-mgr`            |
+| `controller.dashboardSliceName`| EndpointSlice name for dashboard        | `ceph-mgr-dashboard`  |
+| `controller.prometheusSliceName`| EndpointSlice name for prometheus      | `ceph-mgr-prometheus` |
+| `controller.interval`          | Polling interval                        | `30s`                 |
+| `controller.debug`             | Enable debug logging                    | `false`               |
+| `service.create`               | Create a Service for the EndpointSlices | `true`                |
+| `service.ports.dashboard`      | Dashboard service port                  | `8443`                |
+| `service.ports.prometheus`     | Prometheus service port                 | `9283`                |
+| `ceph.config.name`             | ConfigMap containing ceph.conf          | `ceph-config`         |
+| `ceph.keyring.name`            | Secret containing Ceph keyring          | `ceph-keyring`        |
 
 See [values.yaml](./charts/ceph-mgr-endpoint-controller/values.yaml) for all options.
 
