@@ -17,7 +17,6 @@ helm install ceph-mgr-endpoint-controller ./charts/ceph-mgr-endpoint-controller 
 
 | Value                        | Description                             | Default               |
 | ---------------------------- | --------------------------------------- | --------------------- |
-| `controller.namespace`       | Kubernetes namespace for EndpointSlices | `ceph`                |
 | `controller.service`         | Parent Service name for EndpointSlices  | `ceph-mgr`            |
 | `controller.dashboardSlice`  | EndpointSlice name for dashboard        | `ceph-mgr-dashboard`  |
 | `controller.prometheusSlice` | EndpointSlice name for prometheus       | `ceph-mgr-prometheus` |
