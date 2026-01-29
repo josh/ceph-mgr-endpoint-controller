@@ -6,6 +6,9 @@ metadata:
   labels:
     {{- include "ceph-mgr-endpoint-controller.labels" . | nindent 4 }}
 rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get"]
   - apiGroups: ["discovery.k8s.io"]
     resources: ["endpointslices"]
     verbs: ["get", "create", "patch"]

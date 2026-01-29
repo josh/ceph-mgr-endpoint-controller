@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	discoveryv1apply "k8s.io/client-go/applyconfigurations/discovery/v1"
+	applyconfigmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -82,6 +83,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
 	conn, err := rados.NewConnWithUser(cephID)
 	if err != nil {
 		slog.Error("failed to create rados connection", "error", err)
@@ -114,9 +118,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
 
 	if err := run(ctx, conn, clientset); err != nil {
 		slog.Error("run failed", "error", err)
@@ -422,6 +423,18 @@ func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset, s
 				WithPort(addr.port).
 				WithProtocol(corev1.ProtocolTCP),
 		)
+
+	if svc, err := clientset.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{}); err != nil {
+		slog.Warn("failed to get service for owner reference", "namespace", namespace, "service", serviceName, "error", err)
+	} else {
+		slice = slice.WithOwnerReferences(
+			applyconfigmetav1.OwnerReference().
+				WithAPIVersion("v1").
+				WithKind("Service").
+				WithName(svc.Name).
+				WithUID(svc.UID),
+		)
+	}
 
 	_, err = sliceClient.Apply(ctx, slice, metav1.ApplyOptions{FieldManager: "ceph-mgr-endpoint-controller"})
 	if err != nil {
