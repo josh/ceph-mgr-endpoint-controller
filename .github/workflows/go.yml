@@ -32,6 +32,6 @@ jobs:
         run: |
           go build
 
-      - name: Check
+      - name: Print version
         run: |
-          ./ceph-mgr-endpoint-controller build-check
+          ./ceph-mgr-endpoint-controller version

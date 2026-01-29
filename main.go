@@ -111,9 +111,18 @@ func loadConfig() (config, error) {
 	}, nil
 }
 
+var version = "0.3.1"
+
 var cfg config
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		major, minor, patch := rados.Version()
+		fmt.Printf("ceph-mgr-endpoint-controller: %s\n", version)
+		fmt.Printf("librados: %d.%d.%d\n", major, minor, patch)
+		return
+	}
+
 	var err error
 	cfg, err = loadConfig()
 	if err != nil {
