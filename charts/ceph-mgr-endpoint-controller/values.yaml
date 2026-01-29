@@ -4,19 +4,16 @@ image:
   pullPolicy: IfNotPresent
 
 ceph:
-  id: admin
-  configPath: ""
-  keyringPath: ""
-  extraArgs: []
+  secret:
+    name: "{{ include "ceph-mgr-endpoint-controller.fullname" . }}-secret"
+    userID: userID
+    userKey: userKey
   config:
     create: true
     name: ceph-config
     content: ""
     clusterID: ""
     monitors: []
-  keyring:
-    type: keyring
-    name: ceph-keyring
 
 controller:
   mode: deployment

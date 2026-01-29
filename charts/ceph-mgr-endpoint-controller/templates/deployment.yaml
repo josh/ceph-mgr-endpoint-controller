@@ -42,31 +42,16 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: CEPH_ID
-              value: {{ .Values.ceph.id | quote }}
-            {{- if .Values.ceph.configPath }}
-            - name: CEPH_CONF
-              value: {{ .Values.ceph.configPath | quote }}
-            {{- end }}
-            {{- if .Values.ceph.keyringPath }}
-            - name: CEPH_KEYRING
-              value: {{ .Values.ceph.keyringPath | quote }}
-            {{- end }}
-            {{- if .Values.ceph.extraArgs }}
-            - name: CEPH_ARGS
-              value: {{ join " " .Values.ceph.extraArgs | quote }}
-            {{- end }}
-            {{- if eq .Values.ceph.keyring.type "csi" }}
-            - name: CEPH_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.ceph.keyring.name }}
-                  key: userID
+                  name: {{ .Values.ceph.secret.name }}
+                  key: {{ .Values.ceph.secret.userID }}
             - name: CEPH_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.ceph.keyring.name }}
-                  key: userKey
-            {{- end }}
+                  name: {{ .Values.ceph.secret.name }}
+                  key: {{ .Values.ceph.secret.userKey }}
+
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -94,8 +79,4 @@ spec:
             sources:
               - configMap:
                   name: {{ .Values.ceph.config.name }}
-              {{- if ne .Values.ceph.keyring.type "csi" }}
-              - secret:
-                  name: {{ .Values.ceph.keyring.name }}
-              {{- end }}
 {{- end }}
