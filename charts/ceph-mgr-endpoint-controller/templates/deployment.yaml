@@ -53,10 +53,6 @@ spec:
               value: {{ .Values.controller.interval | quote }}
             - name: CEPH_ID
               value: {{ .Values.ceph.id | quote }}
-            {{- if .Values.controller.debug }}
-            - name: CEPH_MGR_DEBUG
-              value: "true"
-            {{- end }}
             {{- if .Values.ceph.configPath }}
             - name: CEPH_CONF
               value: {{ .Values.ceph.configPath | quote }}
@@ -95,7 +91,14 @@ spec:
             - name: ceph-config
               mountPath: /etc/ceph
               readOnly: true
+            - name: controller-config
+              mountPath: /etc/ceph-mgr-endpoint-controller.json
+              subPath: config.json
+              readOnly: true
       volumes:
+        - name: controller-config
+          configMap:
+            name: {{ include "ceph-mgr-endpoint-controller.fullname" . }}-config
         - name: ceph-config
           projected:
             sources:

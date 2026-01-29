@@ -31,9 +31,25 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-func getEnvBool(key string) bool {
-	value := os.Getenv(key)
-	return value != "" && value != "0" && value != "false"
+type config struct {
+	Debug bool `json:"debug"`
+}
+
+func loadConfig() (config, error) {
+	path := getEnv("CEPH_MGR_CONFIG_PATH", "/etc/ceph-mgr-endpoint-controller.json")
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return config{}, nil
+		}
+		return config{}, fmt.Errorf("open config file: %w", err)
+	}
+	defer f.Close()
+	var cfg config
+	if err := json.NewDecoder(f).Decode(&cfg); err != nil {
+		return config{}, fmt.Errorf("decode config file: %w", err)
+	}
+	return cfg, nil
 }
 
 func getEnvDuration(key string) time.Duration {
@@ -55,8 +71,8 @@ var (
 	dashboardSlice  = getEnv("CEPH_MGR_DASHBOARD_SLICE", "")
 	prometheusSlice = getEnv("CEPH_MGR_PROMETHEUS_SLICE", "")
 	interval        = getEnvDuration("CEPH_MGR_INTERVAL")
-	debug           = getEnvBool("CEPH_MGR_DEBUG")
 	cephID          = getEnv("CEPH_ID", "admin")
+	cfg             config
 )
 
 func main() {
@@ -69,7 +85,14 @@ func main() {
 		}
 	}
 
-	if debug {
+	var err error
+	cfg, err = loadConfig()
+	if err != nil {
+		slog.Error("failed to load config", "error", err)
+		os.Exit(1)
+	}
+
+	if cfg.Debug {
 		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	}
 
