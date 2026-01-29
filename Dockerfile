@@ -13,7 +13,6 @@ FROM alpine:3.23@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f21
 RUN apk add --no-cache librados19=19.2.3-r3
 
 COPY --from=builder /app/ceph-mgr-endpoint-controller /usr/local/bin/
-RUN ceph-mgr-endpoint-controller build-check
 
 LABEL org.opencontainers.image.source="https://github.com/josh/ceph-mgr-endpoint-controller"
 LABEL org.opencontainers.image.description="Ceph MGR Endpoint Controller"
