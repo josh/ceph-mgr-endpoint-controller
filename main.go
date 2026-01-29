@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"reflect"
 	"strconv"
 	"syscall"
 	"time"
@@ -168,6 +169,22 @@ func main() {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			newCfg, err := loadConfig()
+			if err != nil {
+				slog.Error("failed to reload config, using previous configuration", "error", err)
+			} else if !reflect.DeepEqual(cfg, newCfg) {
+				slog.Debug("configuration changed", "from", cfg, "to", newCfg)
+				if newCfg.Debug != cfg.Debug {
+					slog.Info("log level changed", "debug", newCfg.Debug)
+					if newCfg.Debug {
+						slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
+					} else {
+						slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{})))
+					}
+				}
+				cfg = newCfg
+			}
+
 			if err := run(ctx, conn, clientset); err != nil {
 				slog.Error("run failed", "error", err)
 			}
