@@ -82,12 +82,10 @@ func loadConfig() (config, error) {
 		if err != nil {
 			return config{}, fmt.Errorf("invalid duration in config: %w", err)
 		}
-		if parsed < 0 {
+		if parsed <= 0 {
 			return config{}, fmt.Errorf("interval must be positive: %s", raw.Interval)
 		}
-		if parsed != 0 {
-			interval = parsed
-		}
+		interval = parsed
 	}
 	debug := false
 	if raw.Debug != nil {
@@ -187,13 +185,6 @@ func main() {
 
 	if err := run(ctx, conn, clientset); err != nil {
 		slog.Error("run failed", "error", err)
-		if interval == 0 {
-			os.Exit(1)
-		}
-	}
-
-	if interval == 0 {
-		return
 	}
 
 	ticker := time.NewTicker(interval)
@@ -219,10 +210,6 @@ func main() {
 				}
 				if newCfg.interval != cfg.interval {
 					interval = newCfg.interval
-					if interval == 0 {
-						slog.Info("interval disabled")
-						return
-					}
 					ticker.Reset(interval)
 					slog.Info("interval changed", "interval", interval)
 				}

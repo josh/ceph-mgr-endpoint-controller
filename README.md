@@ -27,16 +27,11 @@ helm install ceph-mgr-endpoint-controller ./charts/ceph-mgr-endpoint-controller 
 | `ceph.config.name`                              | ConfigMap name for ceph.conf            | `ceph-config`                               |
 | `ceph.config.clusterID`                         | Ceph cluster FSID                       | `""`                                        |
 | `ceph.config.monitors`                          | List of monitor addresses               | `[]`                                        |
-| `controller.mode`                               | Run as `deployment` or `cronjob`        | `deployment`                                |
 | `controller.serviceName`                        | Parent Service name for EndpointSlices  | `ceph-mgr`                                  |
 | `controller.dashboardSliceName`                 | EndpointSlice name for dashboard        | `ceph-mgr-dashboard`                        |
 | `controller.prometheusSliceName`                | EndpointSlice name for prometheus       | `ceph-mgr-prometheus`                       |
 | `controller.interval`                           | Polling interval                        | `30s`                                       |
 | `controller.debug`                              | Enable debug logging                    | `false`                                     |
-| `controller.cronjob.schedule`                   | CronJob schedule                        | `*/5 * * * *`                               |
-| `controller.cronjob.concurrencyPolicy`          | CronJob concurrency policy              | `Forbid`                                    |
-| `controller.cronjob.successfulJobsHistoryLimit` | Successful job history limit            | `1`                                         |
-| `controller.cronjob.failedJobsHistoryLimit`     | Failed job history limit                | `1`                                         |
 | `service.create`                                | Create a Service for the EndpointSlices | `true`                                      |
 | `service.ports.dashboard`                       | Dashboard service port                  | `8443`                                      |
 | `service.ports.prometheus`                      | Prometheus service port                 | `9283`                                      |

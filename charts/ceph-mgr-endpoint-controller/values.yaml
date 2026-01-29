@@ -15,17 +15,11 @@ ceph:
     monitors: []
 
 controller:
-  mode: deployment
   serviceName: ceph-mgr
   dashboardSliceName: ceph-mgr-dashboard
   prometheusSliceName: ceph-mgr-prometheus
   interval: 30s
   debug: false
-  cronjob:
-    schedule: "*/5 * * * *"
-    concurrencyPolicy: Forbid
-    successfulJobsHistoryLimit: 1
-    failedJobsHistoryLimit: 1
 
 service:
   create: true
