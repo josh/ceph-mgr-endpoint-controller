@@ -55,6 +55,7 @@ var (
 	prometheusSlice = getEnv("CEPH_MGR_PROMETHEUS_SLICE", "")
 	interval        = getEnvDuration("CEPH_MGR_INTERVAL")
 	debug           = getEnvBool("CEPH_MGR_DEBUG")
+	cephID          = getEnv("CEPH_ID", "admin")
 )
 
 func main() {
@@ -81,7 +82,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	conn, err := rados.NewConn()
+	conn, err := rados.NewConnWithUser(cephID)
 	if err != nil {
 		slog.Error("failed to create rados connection", "error", err)
 		os.Exit(1)
@@ -173,7 +174,7 @@ func runCheck() int {
 	fmt.Printf("  [PASS] librados: %d.%d.%d\n", major, minor, patch)
 	passed++
 
-	conn, err := rados.NewConn()
+	conn, err := rados.NewConnWithUser(cephID)
 	if err != nil {
 		fmt.Printf("  [FAIL] Ceph config readable: %v\n", err)
 		failed++

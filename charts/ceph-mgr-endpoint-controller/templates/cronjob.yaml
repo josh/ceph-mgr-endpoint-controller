@@ -45,6 +45,8 @@ spec:
                   value: {{ .Values.controller.dashboardSlice | quote }}
                 - name: CEPH_MGR_PROMETHEUS_SLICE
                   value: {{ .Values.controller.prometheusSlice | quote }}
+                - name: CEPH_ID
+                  value: {{ .Values.cephConfig.id | quote }}
                 {{- if .Values.controller.debug }}
                 - name: CEPH_MGR_DEBUG
                   value: "true"

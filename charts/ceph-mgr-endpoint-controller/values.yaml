@@ -17,6 +17,7 @@ service:
     prometheus: 9283
 
 cephConfig:
+  id: admin
   configMap:
     create: false
     name: ceph-config
