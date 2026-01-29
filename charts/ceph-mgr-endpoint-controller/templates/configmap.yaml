@@ -8,5 +8,15 @@ metadata:
     {{- include "ceph-mgr-endpoint-controller.labels" . | nindent 4 }}
 data:
   ceph.conf: |
+    {{- if .Values.cephConfig.configMap.content }}
     {{- .Values.cephConfig.configMap.content | nindent 4 }}
+    {{- else }}
+    [global]
+    {{- if .Values.cephConfig.configMap.clusterID }}
+    fsid = {{ .Values.cephConfig.configMap.clusterID }}
+    {{- end }}
+    {{- if .Values.cephConfig.configMap.monitors }}
+    mon_host = {{ join "," .Values.cephConfig.configMap.monitors }}
+    {{- end }}
+    {{- end }}
 {{- end }}

@@ -19,9 +19,11 @@ service:
 cephConfig:
   id: admin
   configMap:
-    create: false
+    create: true
     name: ceph-config
     content: ""
+    clusterID: ""
+    monitors: []
   secret:
     name: ceph-keyring
   configPath: ""
