@@ -32,8 +32,14 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
+type rawConfig struct {
+	Debug    *bool  `json:"debug,omitempty"`
+	Interval string `json:"interval,omitempty"`
+}
+
 type config struct {
-	Debug bool `json:"debug"`
+	debug    bool
+	interval time.Duration
 }
 
 func loadConfig() (config, error) {
@@ -46,24 +52,31 @@ func loadConfig() (config, error) {
 		return config{}, fmt.Errorf("open config file: %w", err)
 	}
 	defer f.Close()
-	var cfg config
-	if err := json.NewDecoder(f).Decode(&cfg); err != nil {
+	var raw rawConfig
+	if err := json.NewDecoder(f).Decode(&raw); err != nil {
 		return config{}, fmt.Errorf("decode config file: %w", err)
 	}
-	return cfg, nil
-}
-
-func getEnvDuration(key string) time.Duration {
-	value := os.Getenv(key)
-	if value == "" {
-		return 0
+	var interval time.Duration
+	if raw.Interval != "" {
+		parsed, err := time.ParseDuration(raw.Interval)
+		if err != nil {
+			return config{}, fmt.Errorf("invalid duration in config: %w", err)
+		}
+		if parsed < 0 {
+			return config{}, fmt.Errorf("interval must be positive: %s", raw.Interval)
+		}
+		if parsed != 0 {
+			interval = parsed
+		}
 	}
-	d, err := time.ParseDuration(value)
-	if err != nil {
-		slog.Error("invalid duration", "env", key, "value", value, "error", err)
-		return 0
+	debug := false
+	if raw.Debug != nil {
+		debug = *raw.Debug
 	}
-	return d
+	return config{
+		debug:    debug,
+		interval: interval,
+	}, nil
 }
 
 var (
@@ -71,7 +84,6 @@ var (
 	serviceName     = getEnv("CEPH_MGR_SERVICE_NAME", "")
 	dashboardSlice  = getEnv("CEPH_MGR_DASHBOARD_SLICE", "")
 	prometheusSlice = getEnv("CEPH_MGR_PROMETHEUS_SLICE", "")
-	interval        = getEnvDuration("CEPH_MGR_INTERVAL")
 	cephID          = getEnv("CEPH_ID", "admin")
 	cfg             config
 )
@@ -93,9 +105,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if cfg.Debug {
+	if cfg.debug {
 		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	}
+
+	interval := cfg.interval
 
 	if (dashboardSlice != "" || prometheusSlice != "") && namespace == "" {
 		slog.Error("CEPH_MGR_NAMESPACE is required when creating EndpointSlices")
@@ -143,6 +157,7 @@ func main() {
 
 	var clientset *kubernetes.Clientset
 	if dashboardSlice != "" || prometheusSlice != "" {
+		var err error
 		clientset, err = getKubeClient()
 		if err != nil {
 			slog.Error("failed to connect to kubernetes", "error", err)
@@ -174,13 +189,22 @@ func main() {
 				slog.Error("failed to reload config, using previous configuration", "error", err)
 			} else if !reflect.DeepEqual(cfg, newCfg) {
 				slog.Debug("configuration changed", "from", cfg, "to", newCfg)
-				if newCfg.Debug != cfg.Debug {
-					slog.Info("log level changed", "debug", newCfg.Debug)
-					if newCfg.Debug {
+				if newCfg.debug != cfg.debug {
+					slog.Info("log level changed", "debug", newCfg.debug)
+					if newCfg.debug {
 						slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
 					} else {
 						slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{})))
 					}
+				}
+				if newCfg.interval != cfg.interval {
+					interval = newCfg.interval
+					if interval == 0 {
+						slog.Info("interval disabled")
+						return
+					}
+					ticker.Reset(interval)
+					slog.Info("interval changed", "interval", interval)
 				}
 				cfg = newCfg
 			}

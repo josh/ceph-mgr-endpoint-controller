@@ -49,8 +49,6 @@ spec:
               value: {{ .Values.controller.dashboardSliceName | quote }}
             - name: CEPH_MGR_PROMETHEUS_SLICE
               value: {{ .Values.controller.prometheusSliceName | quote }}
-            - name: CEPH_MGR_INTERVAL
-              value: {{ .Values.controller.interval | quote }}
             - name: CEPH_ID
               value: {{ .Values.ceph.id | quote }}
             {{- if .Values.ceph.configPath }}
