@@ -29,6 +29,13 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: controller
           image: "{{ .Values.image.repository }}:{{ include "ceph-mgr-endpoint-controller.imageTag" . }}"
@@ -62,6 +69,12 @@ spec:
             - name: CEPH_ARGS
               value: {{ join " " .Values.ceph.extraArgs | quote }}
             {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

@@ -19,4 +19,6 @@ LABEL org.opencontainers.image.source="https://github.com/josh/ceph-mgr-endpoint
 LABEL org.opencontainers.image.description="Ceph MGR Endpoint Controller"
 LABEL org.opencontainers.image.licenses="MIT"
 
+USER 65534
+
 ENTRYPOINT ["ceph-mgr-endpoint-controller"]
