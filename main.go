@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"reflect"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -24,13 +25,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
 
 type rawConfig struct {
 	Debug           *bool  `json:"debug,omitempty"`
@@ -48,14 +42,32 @@ type config struct {
 	serviceName     string
 	dashboardSlice  string
 	prometheusSlice string
+	cephID          string
+	cephKey         string
 }
 
 func loadConfig() (config, error) {
-	path := getEnv("CEPH_MGR_CONFIG_PATH", "/etc/ceph-mgr-endpoint-controller.json")
+	var cephID string
+	if data, err := os.ReadFile("/var/run/secrets/ceph/userID"); err == nil {
+		cephID = strings.TrimSpace(string(data))
+	}
+
+	var cephKey string
+	if data, err := os.ReadFile("/var/run/secrets/ceph/userKey"); err == nil {
+		cephKey = strings.TrimSpace(string(data))
+	}
+
+	path := "/etc/ceph-mgr-endpoint-controller.json"
+	if v := os.Getenv("CEPH_MGR_CONFIG_PATH"); v != "" {
+		path = v
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return config{}, nil
+			return config{
+				cephID:  cephID,
+				cephKey: cephKey,
+			}, nil
 		}
 		return config{}, fmt.Errorf("open config file: %w", err)
 	}
@@ -94,13 +106,12 @@ func loadConfig() (config, error) {
 		serviceName:     raw.ServiceName,
 		dashboardSlice:  raw.DashboardSlice,
 		prometheusSlice: raw.PrometheusSlice,
+		cephID:          cephID,
+		cephKey:         cephKey,
 	}, nil
 }
 
-var (
-	cephID = getEnv("CEPH_ID", "admin")
-	cfg    config
-)
+var cfg config
 
 func main() {
 	if len(os.Args) > 1 {
@@ -128,7 +139,12 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	conn, err := rados.NewConnWithUser(cephID)
+	var conn *rados.Conn
+	if cfg.cephID != "" {
+		conn, err = rados.NewConnWithUser(cfg.cephID)
+	} else {
+		conn, err = rados.NewConn()
+	}
 	if err != nil {
 		slog.Error("failed to create rados connection", "error", err)
 		os.Exit(1)
@@ -145,8 +161,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if cephKey := os.Getenv("CEPH_KEY"); cephKey != "" {
-		if err := conn.SetConfigOption("key", cephKey); err != nil {
+	if cfg.cephKey != "" {
+		if err := conn.SetConfigOption("key", cfg.cephKey); err != nil {
 			slog.Error("failed to set ceph key", "error", err)
 			os.Exit(1)
 		}
@@ -250,7 +266,19 @@ func runCheck() int {
 	fmt.Printf("  [PASS] librados: %d.%d.%d\n", major, minor, patch)
 	passed++
 
-	conn, err := rados.NewConnWithUser(cephID)
+	checkCfg, cfgErr := loadConfig()
+	if cfgErr != nil {
+		fmt.Printf("  [FAIL] Load config: %v\n", cfgErr)
+		return 1
+	}
+
+	var conn *rados.Conn
+	var err error
+	if checkCfg.cephID != "" {
+		conn, err = rados.NewConnWithUser(checkCfg.cephID)
+	} else {
+		conn, err = rados.NewConn()
+	}
 	if err != nil {
 		fmt.Printf("  [FAIL] Ceph config readable: %v\n", err)
 		failed++

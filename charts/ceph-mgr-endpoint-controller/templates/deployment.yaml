@@ -40,18 +40,6 @@ spec:
         - name: controller
           image: "{{ .Values.image.repository }}:{{ include "ceph-mgr-endpoint-controller.imageTag" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          env:
-            - name: CEPH_ID
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.ceph.secret.name }}
-                  key: {{ .Values.ceph.secret.userID }}
-            - name: CEPH_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.ceph.secret.name }}
-                  key: {{ .Values.ceph.secret.userKey }}
-
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -66,6 +54,9 @@ spec:
             - name: ceph-config
               mountPath: /etc/ceph
               readOnly: true
+            - name: ceph-secret
+              mountPath: /var/run/secrets/ceph
+              readOnly: true
             - name: controller-config
               mountPath: /etc/ceph-mgr-endpoint-controller.json
               subPath: config.json
@@ -79,4 +70,12 @@ spec:
             sources:
               - configMap:
                   name: {{ .Values.ceph.config.name }}
+        - name: ceph-secret
+          secret:
+            secretName: {{ .Values.ceph.secret.name }}
+            items:
+              - key: {{ .Values.ceph.secret.userID }}
+                path: userID
+              - key: {{ .Values.ceph.secret.userKey }}
+                path: userKey
 {{- end }}
