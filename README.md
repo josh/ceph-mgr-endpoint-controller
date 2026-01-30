@@ -8,9 +8,20 @@ This controller connects to a Ceph cluster via RADOS, queries the manager for av
 
 ## Installation
 
+1. Create a secret containing your Ceph credentials:
+
+```bash
+kubectl create secret generic ceph-mgr-endpoint-controller-secret \
+ --from-literal=userID="<your-ceph-user>" \
+ --from-literal=userKey="<your-ceph-key>"
+```
+
+2. Install the chart:
+
 ```bash
 helm install ceph-mgr-endpoint-controller ./charts/ceph-mgr-endpoint-controller \
-  --set ceph.keyring.name=your-ceph-keyring
+ --set config.clusterID="<your-cluster-fsid>" \
+ --set config.monitors="{192.168.1.10,192.168.1.11}"
 ```
 
 ## Configuration
