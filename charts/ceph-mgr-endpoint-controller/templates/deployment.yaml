@@ -57,8 +57,7 @@ spec:
               mountPath: /var/run/secrets/ceph
               readOnly: true
             - name: controller-config
-              mountPath: /etc/ceph-mgr-endpoint-controller.json
-              subPath: config.json
+              mountPath: /etc/ceph-mgr-endpoint-controller
               readOnly: true
       volumes:
         - name: controller-config

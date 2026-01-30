@@ -57,7 +57,7 @@ func loadConfig() (config, error) {
 		cephKey = strings.TrimSpace(string(data))
 	}
 
-	path := "/etc/ceph-mgr-endpoint-controller.json"
+	path := "/etc/ceph-mgr-endpoint-controller/config.json"
 	if v := os.Getenv("CEPH_MGR_CONFIG_PATH"); v != "" {
 		path = v
 	}
