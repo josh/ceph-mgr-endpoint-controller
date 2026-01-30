@@ -68,12 +68,12 @@ spec:
           projected:
             sources:
               - configMap:
-                  name: {{ .Values.ceph.config.name }}
+                  name: {{ .Values.config.name }}
         - name: ceph-secret
           secret:
-            secretName: {{ .Values.ceph.secret.name }}
+            secretName: {{ .Values.secret.name }}
             items:
-              - key: {{ .Values.ceph.secret.userID }}
+              - key: {{ .Values.secret.userID }}
                 path: userID
-              - key: {{ .Values.ceph.secret.userKey }}
+              - key: {{ .Values.secret.userKey }}
                 path: userKey

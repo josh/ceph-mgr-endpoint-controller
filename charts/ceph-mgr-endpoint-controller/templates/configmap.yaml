@@ -1,18 +1,18 @@
-{{- if .Values.ceph.config.create }}
+{{- if .Values.config.create }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ .Values.ceph.config.name }}
+  name: {{ .Values.config.name }}
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "ceph-mgr-endpoint-controller.labels" . | nindent 4 }}
 data:
   ceph.conf: |
     [global]
-    {{- if .Values.ceph.config.clusterID }}
-    fsid = {{ .Values.ceph.config.clusterID }}
+    {{- if .Values.config.clusterID }}
+    fsid = {{ .Values.config.clusterID }}
     {{- end }}
-    {{- if .Values.ceph.config.monitors }}
-    mon_host = {{ join "," .Values.ceph.config.monitors }}
+    {{- if .Values.config.monitors }}
+    mon_host = {{ join "," .Values.config.monitors }}
     {{- end }}
 {{- end }}

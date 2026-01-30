@@ -20,13 +20,13 @@ helm install ceph-mgr-endpoint-controller ./charts/ceph-mgr-endpoint-controller 
 | `image.repository`                              | Container image repository              | `ghcr.io/josh/ceph-mgr-endpoint-controller` |
 | `image.tag`                                     | Container image tag                     | `""`                                        |
 | `image.pullPolicy`                              | Image pull policy                       | `IfNotPresent`                              |
-| `ceph.secret.name`                              | Secret name containing Ceph credentials | `ceph-mgr-endpoint-controller-secret`       |
-| `ceph.secret.userID`                            | Secret key for user ID                  | `userID`                                    |
-| `ceph.secret.userKey`                           | Secret key for user key                 | `userKey`                                   |
-| `ceph.config.create`                            | Create a ConfigMap for ceph.conf        | `true`                                      |
-| `ceph.config.name`                              | ConfigMap name for ceph.conf            | `ceph-config`                               |
-| `ceph.config.clusterID`                         | Ceph cluster FSID                       | `""`                                        |
-| `ceph.config.monitors`                          | List of monitor addresses               | `[]`                                        |
+| `secret.name`                                   | Secret name containing Ceph credentials | `ceph-mgr-endpoint-controller-secret`       |
+| `secret.userID`                                 | Secret key for user ID                  | `userID`                                    |
+| `secret.userKey`                                | Secret key for user key                 | `userKey`                                   |
+| `config.create`                                 | Create a ConfigMap for ceph.conf        | `true`                                      |
+| `config.name`                                   | ConfigMap name for ceph.conf            | `ceph-config`                               |
+| `config.clusterID`                              | Ceph cluster FSID                       | `""`                                        |
+| `config.monitors`                               | List of monitor addresses               | `[]`                                        |
 | `controller.serviceName`                        | Parent Service name for EndpointSlices  | `ceph-mgr`                                  |
 | `controller.dashboardSliceName`                 | EndpointSlice name for dashboard        | `ceph-mgr-dashboard`                        |
 | `controller.prometheusSliceName`                | EndpointSlice name for prometheus       | `ceph-mgr-prometheus`                       |

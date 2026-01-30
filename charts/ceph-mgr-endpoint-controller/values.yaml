@@ -3,16 +3,16 @@ image:
   tag: ""
   pullPolicy: IfNotPresent
 
-ceph:
-  secret:
-    name: ceph-mgr-endpoint-controller-secret
-    userID: userID
-    userKey: userKey
-  config:
-    create: true
-    name: ceph-config
-    clusterID: ""
-    monitors: []
+secret:
+  name: ceph-mgr-endpoint-controller-secret
+  userID: userID
+  userKey: userKey
+
+config:
+  create: true
+  name: ceph-config
+  clusterID: ""
+  monitors: []
 
 controller:
   serviceName: ceph-mgr
