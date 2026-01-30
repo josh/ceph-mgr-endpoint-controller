@@ -33,7 +33,7 @@ Single-file Go application:
 
 ## Code Patterns
 
-- Standard library `flag` for CLI args
+- JSON configuration file for settings
 - `log/slog` for structured logging
 - Kubernetes client-go for API interactions
 - go-ceph RADOS for Ceph communication
