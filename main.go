@@ -283,7 +283,7 @@ type mgrServices struct {
 }
 
 type endpointAddress struct {
-	ip   string
+	ip   net.IP
 	port int32
 }
 
@@ -345,7 +345,7 @@ func parseServiceURL(rawURL string) (*endpointAddress, error) {
 	}
 
 	return &endpointAddress{
-		ip:   ip.String(),
+		ip:   ip,
 		port: int32(port),
 	}, nil
 }
@@ -376,14 +376,19 @@ func updateEndpointSlice(ctx context.Context, cfg config, clientset *kubernetes.
 		return nil
 	}
 
+	addressType := discoveryv1.AddressTypeIPv4
+	if addr.ip.To4() == nil {
+		addressType = discoveryv1.AddressTypeIPv6
+	}
+
 	slice := discoveryv1apply.EndpointSlice(sliceName, cfg.namespace).
 		WithLabels(map[string]string{
 			"kubernetes.io/service-name": cfg.serviceName,
 		}).
-		WithAddressType(discoveryv1.AddressTypeIPv4).
+		WithAddressType(addressType).
 		WithEndpoints(
 			discoveryv1apply.Endpoint().
-				WithAddresses(addr.ip),
+				WithAddresses(addr.ip.String()),
 		).
 		WithPorts(
 			discoveryv1apply.EndpointPort().
@@ -417,13 +422,19 @@ func endpointSliceMatches(cfg config, slice *discoveryv1.EndpointSlice, portName
 	if slice.Labels["kubernetes.io/service-name"] != cfg.serviceName {
 		return false
 	}
-	if slice.AddressType != discoveryv1.AddressTypeIPv4 {
+
+	expectedType := discoveryv1.AddressTypeIPv4
+	if addr.ip.To4() == nil {
+		expectedType = discoveryv1.AddressTypeIPv6
+	}
+	if slice.AddressType != expectedType {
 		return false
 	}
+
 	if len(slice.Endpoints) != 1 || len(slice.Endpoints[0].Addresses) != 1 {
 		return false
 	}
-	if slice.Endpoints[0].Addresses[0] != addr.ip {
+	if slice.Endpoints[0].Addresses[0] != addr.ip.String() {
 		return false
 	}
 	if len(slice.Ports) != 1 {
