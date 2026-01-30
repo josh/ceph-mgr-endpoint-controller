@@ -111,8 +111,6 @@ func loadConfig() (config, error) {
 
 var version = "0.4.0"
 
-var cfg config
-
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "version" {
 		major, minor, patch := rados.Version()
@@ -121,8 +119,7 @@ func main() {
 		return
 	}
 
-	var err error
-	cfg, err = loadConfig()
+	cfg, err := loadConfig()
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
@@ -173,17 +170,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	var clientset *kubernetes.Clientset
-	if cfg.dashboardSlice != "" || cfg.prometheusSlice != "" {
-		var err error
-		clientset, err = getKubeClient()
-		if err != nil {
-			slog.Error("failed to connect to kubernetes", "error", err)
-			os.Exit(1)
-		}
+	clientset, err := getKubeClient()
+	if err != nil {
+		slog.Error("failed to connect to kubernetes", "error", err)
+		os.Exit(1)
 	}
 
-	if err := run(ctx, conn, clientset); err != nil {
+	if err := run(ctx, cfg, conn, clientset); err != nil {
 		slog.Error("run failed", "error", err)
 	}
 
@@ -216,7 +209,7 @@ func main() {
 				cfg = newCfg
 			}
 
-			if err := run(ctx, conn, clientset); err != nil {
+			if err := run(ctx, cfg, conn, clientset); err != nil {
 				slog.Error("run failed", "error", err)
 			}
 		}
@@ -233,7 +226,7 @@ func radosConfigAttrs(conn *rados.Conn) []any {
 	return attrs
 }
 
-func run(ctx context.Context, conn *rados.Conn, clientset *kubernetes.Clientset) error {
+func run(ctx context.Context, cfg config, conn *rados.Conn, clientset *kubernetes.Clientset) error {
 	services, err := getMgrServices(conn)
 	if err != nil {
 		return fmt.Errorf("failed to get mgr services: %w", err)
@@ -258,7 +251,7 @@ func run(ctx context.Context, conn *rados.Conn, clientset *kubernetes.Clientset)
 		if err != nil {
 			return fmt.Errorf("failed to parse dashboard URL: %w", err)
 		}
-		if err := updateEndpointSlice(ctx, clientset, cfg.dashboardSlice, "dashboard", addr); err != nil {
+		if err := updateEndpointSlice(ctx, cfg, clientset, cfg.dashboardSlice, "dashboard", addr); err != nil {
 			return fmt.Errorf("failed to update dashboard EndpointSlice: %w", err)
 		}
 	}
@@ -271,7 +264,7 @@ func run(ctx context.Context, conn *rados.Conn, clientset *kubernetes.Clientset)
 		if err != nil {
 			return fmt.Errorf("failed to parse prometheus URL: %w", err)
 		}
-		if err := updateEndpointSlice(ctx, clientset, cfg.prometheusSlice, "prometheus", addr); err != nil {
+		if err := updateEndpointSlice(ctx, cfg, clientset, cfg.prometheusSlice, "prometheus", addr); err != nil {
 			return fmt.Errorf("failed to update prometheus EndpointSlice: %w", err)
 		}
 	}
@@ -371,14 +364,14 @@ func getKubeClient() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset, sliceName, portName string, addr *endpointAddress) error {
+func updateEndpointSlice(ctx context.Context, cfg config, clientset *kubernetes.Clientset, sliceName, portName string, addr *endpointAddress) error {
 	sliceClient := clientset.DiscoveryV1().EndpointSlices(cfg.namespace)
 
 	existing, err := sliceClient.Get(ctx, sliceName, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return fmt.Errorf("get EndpointSlice: %w", err)
 	}
-	if err == nil && endpointSliceMatches(existing, portName, addr) {
+	if err == nil && endpointSliceMatches(cfg, existing, portName, addr) {
 		slog.Debug("EndpointSlice already up-to-date", "namespace", cfg.namespace, "name", sliceName)
 		return nil
 	}
@@ -420,7 +413,7 @@ func updateEndpointSlice(ctx context.Context, clientset *kubernetes.Clientset, s
 	return nil
 }
 
-func endpointSliceMatches(slice *discoveryv1.EndpointSlice, portName string, addr *endpointAddress) bool {
+func endpointSliceMatches(cfg config, slice *discoveryv1.EndpointSlice, portName string, addr *endpointAddress) bool {
 	if slice.Labels["kubernetes.io/service-name"] != cfg.serviceName {
 		return false
 	}
