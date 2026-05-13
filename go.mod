@@ -1,6 +1,6 @@
 module github.com/josh/ceph-mgr-endpoint-controller
 
-go 1.25.5
+go 1.25.9
 
 require (
 	github.com/ceph/go-ceph v0.39.0
