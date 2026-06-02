@@ -109,7 +109,7 @@ func loadConfig() (config, error) {
 	}, nil
 }
 
-var version = "0.5.0"
+var version = "0.5.1"
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "version" {
