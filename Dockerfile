@@ -10,7 +10,7 @@ RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o ceph-mgr-endpoint-contr
 
 FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 
-RUN apk add --no-cache librados19=19.2.3-r7
+RUN apk add --no-cache librados19=19.2.4-r0
 
 COPY --from=builder /app/ceph-mgr-endpoint-controller /usr/local/bin/
 RUN ceph-mgr-endpoint-controller version
