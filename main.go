@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -243,32 +244,34 @@ func run(ctx context.Context, cfg config, conn *rados.Conn, clientset *kubernete
 		return nil
 	}
 
+	var errs []error
+
 	if cfg.dashboardSlice != "" {
-		if services.Dashboard == "" {
-			return fmt.Errorf("dashboard service URL not found in ceph mgr services")
-		}
-		addr, err := parseServiceURL(services.Dashboard)
-		if err != nil {
-			return fmt.Errorf("failed to parse dashboard URL: %w", err)
-		}
-		if err := updateEndpointSlice(ctx, cfg, clientset, cfg.dashboardSlice, "dashboard", addr); err != nil {
-			return fmt.Errorf("failed to update dashboard EndpointSlice: %w", err)
+		if err := syncEndpointSlice(ctx, cfg, clientset, cfg.dashboardSlice, "dashboard", services.Dashboard); err != nil {
+			errs = append(errs, err)
 		}
 	}
 
 	if cfg.prometheusSlice != "" {
-		if services.Prometheus == "" {
-			return fmt.Errorf("prometheus service URL not found in ceph mgr services")
-		}
-		addr, err := parseServiceURL(services.Prometheus)
-		if err != nil {
-			return fmt.Errorf("failed to parse prometheus URL: %w", err)
-		}
-		if err := updateEndpointSlice(ctx, cfg, clientset, cfg.prometheusSlice, "prometheus", addr); err != nil {
-			return fmt.Errorf("failed to update prometheus EndpointSlice: %w", err)
+		if err := syncEndpointSlice(ctx, cfg, clientset, cfg.prometheusSlice, "prometheus", services.Prometheus); err != nil {
+			errs = append(errs, err)
 		}
 	}
 
+	return stderrors.Join(errs...)
+}
+
+func syncEndpointSlice(ctx context.Context, cfg config, clientset *kubernetes.Clientset, sliceName, portName, rawURL string) error {
+	if rawURL == "" {
+		return fmt.Errorf("%s service URL not found in ceph mgr services", portName)
+	}
+	addr, err := parseServiceURL(rawURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse %s URL: %w", portName, err)
+	}
+	if err := updateEndpointSlice(ctx, cfg, clientset, sliceName, portName, addr); err != nil {
+		return fmt.Errorf("failed to update %s EndpointSlice: %w", portName, err)
+	}
 	return nil
 }
 
