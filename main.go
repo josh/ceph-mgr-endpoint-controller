@@ -419,11 +419,20 @@ func getKubeClient() (*kubernetes.Clientset, error) {
 func updateEndpointSlice(ctx context.Context, cfg config, clientset *kubernetes.Clientset, sliceName, portName string, addr *endpointAddress) error {
 	sliceClient := clientset.DiscoveryV1().EndpointSlices(cfg.namespace)
 
+	svc, err := clientset.CoreV1().Services(cfg.namespace).Get(ctx, cfg.serviceName, metav1.GetOptions{})
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("get Service for owner reference: %w", err)
+		}
+		slog.Warn("service not found, applying EndpointSlice without owner reference", "namespace", cfg.namespace, "service", cfg.serviceName)
+		svc = nil
+	}
+
 	existing, err := sliceClient.Get(ctx, sliceName, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return fmt.Errorf("get EndpointSlice: %w", err)
 	}
-	if err == nil && endpointSliceMatches(cfg, existing, portName, addr) {
+	if err == nil && endpointSliceMatches(cfg, existing, portName, addr, svc) {
 		slog.Debug("EndpointSlice already up-to-date", "namespace", cfg.namespace, "name", sliceName)
 		return nil
 	}
@@ -450,9 +459,7 @@ func updateEndpointSlice(ctx context.Context, cfg config, clientset *kubernetes.
 				WithProtocol(corev1.ProtocolTCP),
 		)
 
-	if svc, err := clientset.CoreV1().Services(cfg.namespace).Get(ctx, cfg.serviceName, metav1.GetOptions{}); err != nil {
-		slog.Warn("failed to get service for owner reference", "namespace", cfg.namespace, "service", cfg.serviceName, "error", err)
-	} else {
+	if svc != nil {
 		slice = slice.WithOwnerReferences(
 			applyconfigmetav1.OwnerReference().
 				WithAPIVersion("v1").
@@ -471,12 +478,27 @@ func updateEndpointSlice(ctx context.Context, cfg config, clientset *kubernetes.
 	return nil
 }
 
-func endpointSliceMatches(cfg config, slice *discoveryv1.EndpointSlice, portName string, addr *endpointAddress) bool {
+func endpointSliceMatches(cfg config, slice *discoveryv1.EndpointSlice, portName string, addr *endpointAddress, svc *corev1.Service) bool {
 	if slice.Labels["kubernetes.io/service-name"] != cfg.serviceName {
 		return false
 	}
 
 	if slice.Labels["endpointslice.kubernetes.io/managed-by"] != fieldManager {
+		return false
+	}
+
+	if svc != nil {
+		hasOwnerRef := false
+		for _, ref := range slice.OwnerReferences {
+			if ref.UID == svc.UID {
+				hasOwnerRef = true
+				break
+			}
+		}
+		if !hasOwnerRef {
+			return false
+		}
+	} else if len(slice.OwnerReferences) != 0 {
 		return false
 	}
 
