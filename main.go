@@ -35,6 +35,8 @@ type rawConfig struct {
 	PrometheusSlice string `json:"prometheusSlice,omitempty"`
 }
 
+const defaultInterval = 30 * time.Second
+
 type config struct {
 	debug           bool
 	interval        time.Duration
@@ -65,8 +67,9 @@ func loadConfig() (config, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			return config{
-				cephID:  cephID,
-				cephKey: cephKey,
+				interval: defaultInterval,
+				cephID:   cephID,
+				cephKey:  cephKey,
 			}, nil
 		}
 		return config{}, fmt.Errorf("open config file: %w", err)
@@ -76,7 +79,7 @@ func loadConfig() (config, error) {
 	if err := json.NewDecoder(f).Decode(&raw); err != nil {
 		return config{}, fmt.Errorf("decode config file: %w", err)
 	}
-	var interval time.Duration
+	interval := defaultInterval
 	if raw.Interval != "" {
 		parsed, err := time.ParseDuration(raw.Interval)
 		if err != nil {
