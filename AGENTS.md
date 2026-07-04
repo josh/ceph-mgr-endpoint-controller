@@ -4,9 +4,9 @@ Kubernetes controller that keeps service endpoints pointed to the active Ceph ma
 
 ## Tech Stack
 
-- Go 1.25.5
-- go-ceph v0.37.0 (RADOS client, requires CGO)
-- Kubernetes client-go v0.35.0
+- Go (see go.mod for current version)
+- go-ceph (RADOS client, requires CGO)
+- Kubernetes client-go
 - librados (system library)
 
 ## Build
