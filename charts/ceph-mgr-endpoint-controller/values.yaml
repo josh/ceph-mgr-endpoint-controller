@@ -19,6 +19,7 @@ controller:
   dashboardSliceName: ceph-mgr-dashboard
   prometheusSliceName: ceph-mgr-prometheus
   interval: 30s
+  maxConsecutiveFailures: 10
   debug: false
 
 service:

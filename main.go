@@ -28,19 +28,23 @@ import (
 )
 
 type rawConfig struct {
-	Debug           *bool  `json:"debug,omitempty"`
-	Interval        string `json:"interval,omitempty"`
-	Namespace       string `json:"namespace,omitempty"`
-	ServiceName     string `json:"serviceName,omitempty"`
-	DashboardSlice  string `json:"dashboardSlice,omitempty"`
-	PrometheusSlice string `json:"prometheusSlice,omitempty"`
+	Debug                  *bool  `json:"debug,omitempty"`
+	Interval               string `json:"interval,omitempty"`
+	MaxConsecutiveFailures *int   `json:"maxConsecutiveFailures,omitempty"`
+	Namespace              string `json:"namespace,omitempty"`
+	ServiceName            string `json:"serviceName,omitempty"`
+	DashboardSlice         string `json:"dashboardSlice,omitempty"`
+	PrometheusSlice        string `json:"prometheusSlice,omitempty"`
 }
 
 const defaultInterval = 30 * time.Second
 
+const defaultMaxConsecutiveFailures = 10
+
 type config struct {
 	debug           bool
 	interval        time.Duration
+	maxFailures     int
 	namespace       string
 	serviceName     string
 	dashboardSlice  string
@@ -57,6 +61,7 @@ func (c config) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.Bool("debug", c.debug),
 		slog.Duration("interval", c.interval),
+		slog.Int("maxConsecutiveFailures", c.maxFailures),
 		slog.String("namespace", c.namespace),
 		slog.String("serviceName", c.serviceName),
 		slog.String("dashboardSlice", c.dashboardSlice),
@@ -85,9 +90,10 @@ func loadConfig() (config, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			return config{
-				interval: defaultInterval,
-				cephID:   cephID,
-				cephKey:  cephKey,
+				interval:    defaultInterval,
+				maxFailures: defaultMaxConsecutiveFailures,
+				cephID:      cephID,
+				cephKey:     cephKey,
 			}, nil
 		}
 		return config{}, fmt.Errorf("open config file: %w", err)
@@ -112,6 +118,13 @@ func loadConfig() (config, error) {
 	if raw.Debug != nil {
 		debug = *raw.Debug
 	}
+	maxFailures := defaultMaxConsecutiveFailures
+	if raw.MaxConsecutiveFailures != nil {
+		if *raw.MaxConsecutiveFailures < 1 {
+			return config{}, fmt.Errorf("maxConsecutiveFailures must be positive: %d", *raw.MaxConsecutiveFailures)
+		}
+		maxFailures = *raw.MaxConsecutiveFailures
+	}
 	if (raw.DashboardSlice != "" || raw.PrometheusSlice != "") && raw.Namespace == "" {
 		return config{}, fmt.Errorf("namespace is required when creating EndpointSlices")
 	}
@@ -121,6 +134,7 @@ func loadConfig() (config, error) {
 	return config{
 		debug:           debug,
 		interval:        interval,
+		maxFailures:     maxFailures,
 		namespace:       raw.Namespace,
 		serviceName:     raw.ServiceName,
 		dashboardSlice:  raw.DashboardSlice,
@@ -197,8 +211,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	consecutiveFailures := 0
 	if err := run(ctx, cfg, conn, clientset); err != nil {
-		slog.Error("run failed", "error", err)
+		consecutiveFailures++
+		slog.Error("run failed", "error", err, "consecutiveFailures", consecutiveFailures)
+		if consecutiveFailures >= cfg.maxFailures {
+			slog.Error("too many consecutive failures, exiting", "failures", consecutiveFailures)
+			os.Exit(1)
+		}
 	}
 
 	ticker := time.NewTicker(interval)
@@ -231,7 +251,14 @@ func main() {
 			}
 
 			if err := run(ctx, cfg, conn, clientset); err != nil {
-				slog.Error("run failed", "error", err)
+				consecutiveFailures++
+				slog.Error("run failed", "error", err, "consecutiveFailures", consecutiveFailures)
+				if consecutiveFailures >= cfg.maxFailures {
+					slog.Error("too many consecutive failures, exiting", "failures", consecutiveFailures)
+					os.Exit(1)
+				}
+			} else {
+				consecutiveFailures = 0
 			}
 		}
 	}
