@@ -12,6 +12,10 @@ spec:
       {{- include "ceph-mgr-endpoint-controller.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      {{- if .Values.config.create }}
+      annotations:
+        checksum/ceph-config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      {{- end }}
       labels:
         {{- include "ceph-mgr-endpoint-controller.selectorLabels" . | nindent 8 }}
     spec:
