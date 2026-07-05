@@ -10,8 +10,6 @@ spec:
   ports:
     - name: dashboard
       port: {{ .Values.service.ports.dashboard }}
-      targetPort: dashboard
     - name: prometheus
       port: {{ .Values.service.ports.prometheus }}
-      targetPort: prometheus
 {{- end }}
