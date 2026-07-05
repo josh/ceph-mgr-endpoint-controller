@@ -416,16 +416,16 @@ func getKubeClient() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func updateEndpointSlice(ctx context.Context, cfg config, clientset *kubernetes.Clientset, sliceName, portName string, addr *endpointAddress) error {
-	sliceClient := clientset.DiscoveryV1().EndpointSlices(cfg.namespace)
+var lastAppliedResourceVersion = map[string]string{}
 
-	existing, err := sliceClient.Get(ctx, sliceName, metav1.GetOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("get EndpointSlice: %w", err)
-	}
-	if err == nil && endpointSliceMatches(cfg, existing, portName, addr) {
-		slog.Debug("EndpointSlice already up-to-date", "namespace", cfg.namespace, "name", sliceName)
-		return nil
+func updateEndpointSlice(ctx context.Context, cfg config, clientset *kubernetes.Clientset, sliceName, portName string, addr *endpointAddress) error {
+	svc, err := clientset.CoreV1().Services(cfg.namespace).Get(ctx, cfg.serviceName, metav1.GetOptions{})
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("get Service for owner reference: %w", err)
+		}
+		slog.Warn("service not found, applying EndpointSlice without owner reference", "namespace", cfg.namespace, "service", cfg.serviceName)
+		svc = nil
 	}
 
 	addressType := discoveryv1.AddressTypeIPv4
@@ -450,9 +450,7 @@ func updateEndpointSlice(ctx context.Context, cfg config, clientset *kubernetes.
 				WithProtocol(corev1.ProtocolTCP),
 		)
 
-	if svc, err := clientset.CoreV1().Services(cfg.namespace).Get(ctx, cfg.serviceName, metav1.GetOptions{}); err != nil {
-		slog.Warn("failed to get service for owner reference", "namespace", cfg.namespace, "service", cfg.serviceName, "error", err)
-	} else {
+	if svc != nil {
 		slice = slice.WithOwnerReferences(
 			applyconfigmetav1.OwnerReference().
 				WithAPIVersion("v1").
@@ -462,50 +460,16 @@ func updateEndpointSlice(ctx context.Context, cfg config, clientset *kubernetes.
 		)
 	}
 
-	_, err = sliceClient.Apply(ctx, slice, metav1.ApplyOptions{FieldManager: fieldManager})
+	applied, err := clientset.DiscoveryV1().EndpointSlices(cfg.namespace).Apply(ctx, slice, metav1.ApplyOptions{FieldManager: fieldManager})
 	if err != nil {
 		return fmt.Errorf("apply EndpointSlice: %w", err)
 	}
 
-	slog.Info("applied EndpointSlice", "namespace", cfg.namespace, "name", sliceName, "ip", addr.ip, "port", addr.port)
+	if applied.ResourceVersion != lastAppliedResourceVersion[sliceName] {
+		slog.Info("applied EndpointSlice", "namespace", cfg.namespace, "name", sliceName, "ip", addr.ip, "port", addr.port)
+	} else {
+		slog.Debug("EndpointSlice already up-to-date", "namespace", cfg.namespace, "name", sliceName)
+	}
+	lastAppliedResourceVersion[sliceName] = applied.ResourceVersion
 	return nil
-}
-
-func endpointSliceMatches(cfg config, slice *discoveryv1.EndpointSlice, portName string, addr *endpointAddress) bool {
-	if slice.Labels["kubernetes.io/service-name"] != cfg.serviceName {
-		return false
-	}
-
-	if slice.Labels["endpointslice.kubernetes.io/managed-by"] != fieldManager {
-		return false
-	}
-
-	expectedType := discoveryv1.AddressTypeIPv4
-	if addr.ip.To4() == nil {
-		expectedType = discoveryv1.AddressTypeIPv6
-	}
-	if slice.AddressType != expectedType {
-		return false
-	}
-
-	if len(slice.Endpoints) != 1 || len(slice.Endpoints[0].Addresses) != 1 {
-		return false
-	}
-	if slice.Endpoints[0].Addresses[0] != addr.ip.String() {
-		return false
-	}
-	if len(slice.Ports) != 1 {
-		return false
-	}
-	port := slice.Ports[0]
-	if port.Name == nil || *port.Name != portName {
-		return false
-	}
-	if port.Port == nil || *port.Port != addr.port {
-		return false
-	}
-	if port.Protocol == nil || *port.Protocol != corev1.ProtocolTCP {
-		return false
-	}
-	return true
 }
