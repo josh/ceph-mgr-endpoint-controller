@@ -171,41 +171,13 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	var conn *rados.Conn
-	if cfg.cephID != "" {
-		conn, err = rados.NewConnWithUser(cfg.cephID)
-	} else {
-		conn, err = rados.NewConn()
-	}
+	conn, err := connectRados(cfg)
 	if err != nil {
-		slog.Error("failed to create rados connection", "error", err)
+		slog.Error("failed to set up ceph connection", "error", err)
 		os.Exit(1)
 	}
-	defer conn.Shutdown()
-
-	if err := conn.ReadDefaultConfigFile(); err != nil {
-		slog.Error("failed to read ceph config", "error", err)
-		os.Exit(1)
-	}
-
-	if err := conn.ParseDefaultConfigEnv(); err != nil {
-		slog.Error("failed to parse ceph args env", "error", err)
-		os.Exit(1)
-	}
-
-	if cfg.cephKey != "" {
-		if err := conn.SetConfigOption("key", cfg.cephKey); err != nil {
-			slog.Error("failed to set ceph key", "error", err)
-			os.Exit(1)
-		}
-	}
-
-	slog.Debug("rados config", radosConfigAttrs(conn)...)
-
-	if err := conn.Connect(); err != nil {
-		slog.Error("failed to connect to cluster", append([]any{"error", err}, radosConfigAttrs(conn)...)...)
-		os.Exit(1)
-	}
+	defer func() { conn.Shutdown() }()
+	connCephID, connCephKey := cfg.cephID, cfg.cephKey
 
 	clientset, err := getKubeClient()
 	if err != nil {
@@ -252,6 +224,20 @@ func main() {
 				cfg = newCfg
 			}
 
+			credsChanged := cfg.cephID != connCephID || cfg.cephKey != connCephKey
+			credsPresent := cfg.cephID != "" || cfg.cephKey != ""
+			if credsChanged && credsPresent {
+				slog.Info("ceph credentials changed, reconnecting")
+				newConn, err := connectRados(cfg)
+				if err != nil {
+					slog.Error("failed to reconnect with new credentials, keeping existing connection", "error", err)
+				} else {
+					conn.Shutdown()
+					conn = newConn
+					connCephID, connCephKey = cfg.cephID, cfg.cephKey
+				}
+			}
+
 			if err := run(ctx, cfg, conn, clientset); err != nil {
 				consecutiveFailures++
 				slog.Error("run failed", "error", err, "consecutiveFailures", consecutiveFailures)
@@ -264,6 +250,49 @@ func main() {
 			}
 		}
 	}
+}
+
+func connectRados(cfg config) (*rados.Conn, error) {
+	var conn *rados.Conn
+	var err error
+	if cfg.cephID != "" {
+		conn, err = rados.NewConnWithUser(cfg.cephID)
+	} else {
+		conn, err = rados.NewConn()
+	}
+	if err != nil {
+		return nil, fmt.Errorf("create rados connection: %w", err)
+	}
+	connected := false
+	defer func() {
+		if !connected {
+			conn.Shutdown()
+		}
+	}()
+
+	if err := conn.ReadDefaultConfigFile(); err != nil {
+		return nil, fmt.Errorf("read ceph config: %w", err)
+	}
+
+	if err := conn.ParseDefaultConfigEnv(); err != nil {
+		return nil, fmt.Errorf("parse ceph args env: %w", err)
+	}
+
+	if cfg.cephKey != "" {
+		if err := conn.SetConfigOption("key", cfg.cephKey); err != nil {
+			return nil, fmt.Errorf("set ceph key: %w", err)
+		}
+	}
+
+	slog.Debug("rados config", radosConfigAttrs(conn)...)
+
+	if err := conn.Connect(); err != nil {
+		slog.Error("failed to connect to cluster", append([]any{"error", err}, radosConfigAttrs(conn)...)...)
+		return nil, fmt.Errorf("connect to cluster: %w", err)
+	}
+
+	connected = true
+	return conn, nil
 }
 
 func radosConfigAttrs(conn *rados.Conn) []any {
