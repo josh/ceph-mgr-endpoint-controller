@@ -1,3 +1,7 @@
+{{- $interval := toString .Values.controller.interval }}
+{{- if not (regexMatch `^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$` $interval) }}
+{{- fail (printf "controller.interval must be a Go duration string such as \"30s\" or \"1m30s\", got %q" $interval) }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -6,4 +10,4 @@ metadata:
   labels:
     {{- include "ceph-mgr-endpoint-controller.labels" . | nindent 4 }}
 data:
-  config.json: {{ dict "debug" .Values.controller.debug "interval" .Values.controller.interval "namespace" .Release.Namespace "serviceName" .Values.controller.serviceName "dashboardSlice" .Values.controller.dashboardSliceName "prometheusSlice" .Values.controller.prometheusSliceName | toJson | quote }}
+  config.json: {{ dict "debug" .Values.controller.debug "interval" $interval "namespace" .Release.Namespace "serviceName" .Values.controller.serviceName "dashboardSlice" .Values.controller.dashboardSliceName "prometheusSlice" .Values.controller.prometheusSliceName | toJson | quote }}
