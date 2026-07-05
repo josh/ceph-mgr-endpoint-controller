@@ -144,7 +144,7 @@ func loadConfig() (config, error) {
 	}, nil
 }
 
-var version = "0.5.1"
+var version = "0.6.0"
 
 const fieldManager = "ceph-mgr-endpoint-controller"
 
