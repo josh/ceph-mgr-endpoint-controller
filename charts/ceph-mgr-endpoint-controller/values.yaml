@@ -1,3 +1,6 @@
+nameOverride: ""
+fullnameOverride: ""
+
 image:
   repository: ghcr.io/josh/ceph-mgr-endpoint-controller
   tag: ""
