@@ -146,6 +146,8 @@ func loadConfig() (config, error) {
 
 var version = "0.5.1"
 
+const fieldManager = "ceph-mgr-endpoint-controller"
+
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "version" {
 		major, minor, patch := rados.Version()
@@ -433,7 +435,8 @@ func updateEndpointSlice(ctx context.Context, cfg config, clientset *kubernetes.
 
 	slice := discoveryv1apply.EndpointSlice(sliceName, cfg.namespace).
 		WithLabels(map[string]string{
-			"kubernetes.io/service-name": cfg.serviceName,
+			"kubernetes.io/service-name":             cfg.serviceName,
+			"endpointslice.kubernetes.io/managed-by": fieldManager,
 		}).
 		WithAddressType(addressType).
 		WithEndpoints(
@@ -459,7 +462,7 @@ func updateEndpointSlice(ctx context.Context, cfg config, clientset *kubernetes.
 		)
 	}
 
-	_, err = sliceClient.Apply(ctx, slice, metav1.ApplyOptions{FieldManager: "ceph-mgr-endpoint-controller"})
+	_, err = sliceClient.Apply(ctx, slice, metav1.ApplyOptions{FieldManager: fieldManager})
 	if err != nil {
 		return fmt.Errorf("apply EndpointSlice: %w", err)
 	}
@@ -470,6 +473,10 @@ func updateEndpointSlice(ctx context.Context, cfg config, clientset *kubernetes.
 
 func endpointSliceMatches(cfg config, slice *discoveryv1.EndpointSlice, portName string, addr *endpointAddress) bool {
 	if slice.Labels["kubernetes.io/service-name"] != cfg.serviceName {
+		return false
+	}
+
+	if slice.Labels["endpointslice.kubernetes.io/managed-by"] != fieldManager {
 		return false
 	}
 
