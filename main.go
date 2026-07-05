@@ -48,6 +48,23 @@ type config struct {
 	cephKey         string
 }
 
+func (c config) LogValue() slog.Value {
+	cephKey := ""
+	if c.cephKey != "" {
+		cephKey = "[redacted]"
+	}
+	return slog.GroupValue(
+		slog.Bool("debug", c.debug),
+		slog.Duration("interval", c.interval),
+		slog.String("namespace", c.namespace),
+		slog.String("serviceName", c.serviceName),
+		slog.String("dashboardSlice", c.dashboardSlice),
+		slog.String("prometheusSlice", c.prometheusSlice),
+		slog.String("cephID", c.cephID),
+		slog.String("cephKey", cephKey),
+	)
+}
+
 func loadConfig() (config, error) {
 	var cephID string
 	if data, err := os.ReadFile("/var/run/secrets/ceph/userID"); err == nil {
