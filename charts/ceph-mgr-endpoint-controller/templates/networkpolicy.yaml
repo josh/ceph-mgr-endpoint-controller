@@ -1,0 +1,38 @@
+{{- $ingressEnabled := .Values.networkPolicy.ingress.enabled }}
+{{- $egressEnabled := .Values.networkPolicy.egress.enabled }}
+{{- if or $ingressEnabled $egressEnabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "ceph-mgr-endpoint-controller.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ceph-mgr-endpoint-controller.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "ceph-mgr-endpoint-controller.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    {{- if $ingressEnabled }}
+    - Ingress
+    {{- end }}
+    {{- if $egressEnabled }}
+    - Egress
+  {{- end }}
+  {{- if $ingressEnabled }}
+  {{- if .Values.networkPolicy.ingress.rules }}
+  ingress:
+    {{- toYaml .Values.networkPolicy.ingress.rules | nindent 4 }}
+  {{- else }}
+  ingress: []
+  {{- end }}
+  {{- end }}
+  {{- if $egressEnabled }}
+  {{- if .Values.networkPolicy.egress.rules }}
+  egress:
+    {{- toYaml .Values.networkPolicy.egress.rules | nindent 4 }}
+  {{- else }}
+  egress: []
+  {{- end }}
+  {{- end }}
+{{- end }}

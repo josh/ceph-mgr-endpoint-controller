@@ -35,6 +35,14 @@ serviceAccount:
   create: true
   name: ""
 
+networkPolicy:
+  ingress:
+    enabled: false
+    rules: []
+  egress:
+    enabled: false
+    rules: []
+
 resources:
   limits:
     cpu: 50m
