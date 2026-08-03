@@ -1,5 +1,18 @@
-{{- $ingressEnabled := .Values.networkPolicy.ingress.enabled }}
-{{- $egressEnabled := .Values.networkPolicy.egress.enabled }}
+{{- $ingress := .Values.networkPolicy.ingress }}
+{{- $egress := .Values.networkPolicy.egress }}
+{{- $ingressEnabled := $ingress.enabled }}
+{{- $egressEnabled := $egress.enabled }}
+{{- if $egressEnabled }}
+{{- if and $egress.kubeApiServer.enabled (not $egress.kubeApiServer.hosts) }}
+{{- fail "networkPolicy.egress.kubeApiServer.hosts is required when networkPolicy.egress.kubeApiServer.enabled is true" }}
+{{- end }}
+{{- if and $egress.monitors.enabled (not $egress.monitors.hosts) }}
+{{- fail "networkPolicy.egress.monitors.hosts is required when networkPolicy.egress.monitors.enabled is true" }}
+{{- end }}
+{{- if and $egress.manager.enabled (not (or $egress.manager.hosts $egress.monitors.hosts)) }}
+{{- fail "networkPolicy.egress.manager.hosts is required when networkPolicy.egress.manager.enabled is true and networkPolicy.egress.monitors.hosts is empty" }}
+{{- end }}
+{{- end }}
 {{- if or $ingressEnabled $egressEnabled }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -18,19 +31,55 @@ spec:
     {{- end }}
     {{- if $egressEnabled }}
     - Egress
-  {{- end }}
+    {{- end }}
   {{- if $ingressEnabled }}
-  {{- if .Values.networkPolicy.ingress.rules }}
+  {{- if $ingress.rules }}
   ingress:
-    {{- toYaml .Values.networkPolicy.ingress.rules | nindent 4 }}
+    {{- toYaml $ingress.rules | nindent 4 }}
   {{- else }}
   ingress: []
   {{- end }}
   {{- end }}
   {{- if $egressEnabled }}
-  {{- if .Values.networkPolicy.egress.rules }}
+  {{- $rules := list }}
+  {{- if $egress.dns.enabled }}
+  {{- $dns := dict "ports" (list (dict "protocol" "UDP" "port" 53) (dict "protocol" "TCP" "port" 53)) }}
+  {{- if $egress.dns.to }}
+  {{- $_ := set $dns "to" $egress.dns.to }}
+  {{- end }}
+  {{- $rules = append $rules $dns }}
+  {{- end }}
+  {{- if $egress.kubeApiServer.enabled }}
+  {{- $to := list }}
+  {{- range $host := $egress.kubeApiServer.hosts }}
+  {{- $to = append $to (dict "ipBlock" (dict "cidr" (include "ceph-mgr-endpoint-controller.cidr" $host))) }}
+  {{- end }}
+  {{- $ports := list (dict "protocol" "TCP" "port" (int $egress.kubeApiServer.port)) }}
+  {{- $rules = append $rules (dict "to" $to "ports" $ports) }}
+  {{- end }}
+  {{- if $egress.monitors.enabled }}
+  {{- $to := list }}
+  {{- range $host := $egress.monitors.hosts }}
+  {{- $to = append $to (dict "ipBlock" (dict "cidr" (include "ceph-mgr-endpoint-controller.cidr" $host))) }}
+  {{- end }}
+  {{- $ports := list }}
+  {{- range $port := $egress.monitors.ports }}
+  {{- $ports = append $ports (dict "protocol" "TCP" "port" (int $port)) }}
+  {{- end }}
+  {{- $rules = append $rules (dict "to" $to "ports" $ports) }}
+  {{- end }}
+  {{- if $egress.manager.enabled }}
+  {{- $to := list }}
+  {{- range $host := (or $egress.manager.hosts $egress.monitors.hosts) }}
+  {{- $to = append $to (dict "ipBlock" (dict "cidr" (include "ceph-mgr-endpoint-controller.cidr" $host))) }}
+  {{- end }}
+  {{- $ports := list (dict "protocol" "TCP" "port" (int $egress.manager.portRange.from) "endPort" (int $egress.manager.portRange.to)) }}
+  {{- $rules = append $rules (dict "to" $to "ports" $ports) }}
+  {{- end }}
+  {{- $rules = concat $rules $egress.rules }}
+  {{- if $rules }}
   egress:
-    {{- toYaml .Values.networkPolicy.egress.rules | nindent 4 }}
+    {{- toYaml $rules | nindent 4 }}
   {{- else }}
   egress: []
   {{- end }}
