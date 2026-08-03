@@ -41,6 +41,25 @@ networkPolicy:
     rules: []
   egress:
     enabled: false
+    dns:
+      enabled: true
+      to: []
+    kubeApiServer:
+      enabled: true
+      hosts: []
+      port: 6443
+    monitors:
+      enabled: true
+      hosts: []
+      ports:
+        - 3300
+        - 6789
+    manager:
+      enabled: true
+      hosts: []
+      portRange:
+        from: 6800
+        to: 7300
     rules: []
 
 resources:

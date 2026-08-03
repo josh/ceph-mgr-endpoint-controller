@@ -41,6 +41,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 {{- end }}
 
+{{- define "ceph-mgr-endpoint-controller.cidr" -}}
+{{- $host := . | toString | trimPrefix "[" | trimSuffix "]" -}}
+{{- if contains "/" $host -}}
+{{- $host -}}
+{{- else if contains ":" $host -}}
+{{- printf "%s/128" $host -}}
+{{- else -}}
+{{- printf "%s/32" $host -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "ceph-mgr-endpoint-controller.imageTag" -}}
 {{- if .Values.image.tag -}}
     {{- .Values.image.tag -}}
