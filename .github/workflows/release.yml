@@ -4,15 +4,6 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Git Tag"
-        required: true
-        type: string
-
-env:
-  IMAGE: ghcr.io/josh/ceph-mgr-endpoint-controller
 
 permissions:
   contents: read
@@ -20,102 +11,24 @@ permissions:
 
 jobs:
   build:
-    name: build (${{ matrix.platform }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: linux/amd64
-            runner: ubuntu-24.04
-            arch: amd64
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
-            arch: arm64
-    runs-on: ${{ matrix.runner }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          ref: ${{ inputs.tag || github.ref }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-
-      - name: Log in to GHCR
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
-        with:
-          registry: ghcr.io
+    uses: docker/github-builder/.github/workflows/build.yml@3415a188caae9a0da7fba83bc06985776e0b1790 # v1.14.0
+    permissions:
+      contents: read
+      packages: write
+    with:
+      output: image
+      push: true
+      platforms: linux/amd64,linux/arm64
+      cache: true
+      cache-mode: max
+      sign: "false"
+      meta-images: ghcr.io/josh/ceph-mgr-endpoint-controller
+      meta-tags: |
+        type=semver,pattern={{version}}
+        type=raw,value=latest
+      set-meta-labels: true
+    secrets:
+      registry-auths: |
+        - registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push by digest
-        id: build
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          provenance: false
-          platforms: ${{ matrix.platform }}
-          labels: |
-            org.opencontainers.image.version=${{ inputs.tag || github.ref_name }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          tags: ${{ env.IMAGE }}
-          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha,scope=${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
-        env:
-          SOURCE_DATE_EPOCH: 0
-
-      - name: Export digest
-        run: |
-          mkdir -p ${{ runner.temp }}/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "${{ runner.temp }}/digests/${digest#sha256:}"
-
-      - name: Upload digest
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: digests-${{ matrix.arch }}
-          path: ${{ runner.temp }}/digests/*
-          if-no-files-found: error
-          retention-days: 1
-
-  push:
-    name: push
-    runs-on: ubuntu-24.04
-    needs: build
-
-    steps:
-      - name: Download digest artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          path: ${{ runner.temp }}/digests
-          pattern: digests-*
-          merge-multiple: true
-
-      - name: Extract digests from artifacts
-        id: digests
-        working-directory: ${{ runner.temp }}/digests
-        run: |
-          sources=()
-          for digest in *; do
-            sources+=("${{ env.IMAGE }}@sha256:${digest}")
-          done
-          echo "sources=${sources[*]}" >>"$GITHUB_OUTPUT"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-
-      - name: Log in to GHCR
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create manifest list and push
-        run: |
-          docker buildx imagetools create \
-            --tag ${{ env.IMAGE }}:${{ inputs.tag || github.ref_name }} \
-            --tag ${{ env.IMAGE }}:latest \
-            ${{ steps.digests.outputs.sources }}

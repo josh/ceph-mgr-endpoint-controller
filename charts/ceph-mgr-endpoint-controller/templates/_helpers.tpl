@@ -45,6 +45,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if .Values.image.tag -}}
     {{- .Values.image.tag -}}
 {{- else -}}
-    v{{ .Chart.AppVersion }}
+    {{ .Chart.AppVersion }}
 {{- end -}}
 {{- end -}}

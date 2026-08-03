@@ -29,7 +29,7 @@ helm install ceph-mgr-endpoint-controller ./charts/ceph-mgr-endpoint-controller 
 | Value                               | Description                             | Default                                     |
 | ----------------------------------- | --------------------------------------- | ------------------------------------------- |
 | `image.repository`                  | Container image repository              | `ghcr.io/josh/ceph-mgr-endpoint-controller` |
-| `image.tag`                         | Container image tag                     | `""`                                        |
+| `image.tag`                         | Container image tag (chart `appVersion`) | `""`                                       |
 | `image.pullPolicy`                  | Image pull policy                       | `IfNotPresent`                              |
 | `secret.name`                       | Secret name containing Ceph credentials | `ceph-mgr-endpoint-controller-secret`       |
 | `secret.userID`                     | Secret key for user ID                  | `userID`                                    |
