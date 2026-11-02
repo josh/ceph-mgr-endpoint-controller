@@ -3,7 +3,7 @@ module github.com/josh/ceph-mgr-endpoint-controller
 go 1.26.0
 
 require (
-	github.com/ceph/go-ceph v0.42.0
+	github.com/ceph/go-ceph v0.42.1
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
 	k8s.io/client-go v0.37.1
