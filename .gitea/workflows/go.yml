@@ -9,15 +9,17 @@ permissions:
 
 jobs:
   build:
-    name: build (${{ matrix.platform }})
+    name: build (${{ matrix.ceph }}, linux/${{ matrix.arch }})
     strategy:
       matrix:
-        include:
-          - platform: linux/amd64
-            runner: ubuntu-amd64
-          - platform: linux/arm64
-            runner: ubuntu-arm64
-    runs-on: ${{ matrix.runner }}
+        ceph:
+          - umbrella
+          - tentacle
+          - squid
+        arch:
+          - amd64
+          - arm64
+    runs-on: ceph-${{ matrix.ceph }}-${{ matrix.arch }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -25,11 +27,6 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-
-      - name: Install librados
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y librados-dev
 
       - name: Build
         run: |
